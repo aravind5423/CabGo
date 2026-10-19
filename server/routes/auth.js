@@ -1,32 +1,263 @@
 // server/routes/auth.js
-// Auth routes: register, login, logout, /me
-// Will be fully implemented on Day 2
+// Full auth implementation: register, login, logout, /me, ride search stub
 
 'use strict';
 
-/**
- * @param {import('../router')} router
- */
+const crypto = require('crypto');
+const pool   = require('../db');
+const { createToken, requireRole } = require('../middleware/auth');
+const { logAction, getClientIp }   = require('../middleware/logger');
+
+// ── Password helpers (Node built-in crypto only) ─────────────
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const incoming = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  // timing-safe comparison
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(incoming, 'hex'));
+  } catch { return false; }
+}
+
+// ── Input validators ─────────────────────────────────────────
+const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^[6-9]\d{9}$/;
+
 module.exports = function authRoute(router) {
-  // Health check
+
+  // ── GET /api/health ──────────────────────────────────────
   router.get('/api/health', async (req, res) => {
-    req.sendJSON(200, { success: true, message: '🚖 Cab Booking API is running', timestamp: new Date().toISOString() });
+    req.sendJSON(200, {
+      success:   true,
+      message:   '🚖 Cab Booking API is running',
+      timestamp: new Date().toISOString(),
+    });
   });
 
-  // Placeholder — full implementation on Day 2
+  // ── POST /api/auth/register ──────────────────────────────
   router.post('/api/auth/register', async (req, res) => {
-    req.sendJSON(501, { success: false, message: 'Register endpoint coming on Day 2' });
+    const {
+      name, email, password, mobile, role,
+      license_no, license_expiry,
+      default_address, emergency_contact,
+    } = req.body;
+
+    // Required field check
+    if (!name || !email || !password || !mobile || !role) {
+      return req.sendJSON(400, { success: false, message: 'Name, email, password, mobile and role are required.' });
+    }
+    if (!['passenger', 'driver'].includes(role)) {
+      return req.sendJSON(400, { success: false, message: 'Role must be passenger or driver.' });
+    }
+    if (!EMAIL_RE.test(email)) {
+      return req.sendJSON(400, { success: false, message: 'Invalid email address.' });
+    }
+    if (!MOBILE_RE.test(mobile)) {
+      return req.sendJSON(400, { success: false, message: 'Invalid mobile number (10 digits, starting with 6-9).' });
+    }
+    if (password.length < 6) {
+      return req.sendJSON(400, { success: false, message: 'Password must be at least 6 characters.' });
+    }
+    if (role === 'driver' && (!license_no || !license_expiry)) {
+      return req.sendJSON(400, { success: false, message: 'License number and expiry are required for drivers.' });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Duplicate email check
+      const [existing] = await conn.execute(
+        'SELECT user_id FROM users WHERE email = ?',
+        [email.toLowerCase().trim()]
+      );
+      if (existing.length > 0) {
+        await conn.rollback();
+        return req.sendJSON(409, { success: false, message: 'Email is already registered.' });
+      }
+
+      // Insert user
+      const hashed = hashPassword(password);
+      const [userResult] = await conn.execute(
+        `INSERT INTO users (name, email, password, mobile, role, status, created_at)
+         VALUES (?, ?, ?, ?, ?, 'active', NOW())`,
+        [name.trim(), email.toLowerCase().trim(), hashed, mobile.trim(), role]
+      );
+      const userId = userResult.insertId;
+
+      // Insert role-specific profile
+      if (role === 'passenger') {
+        await conn.execute(
+          `INSERT INTO passenger_profiles (user_id, default_address, emergency_contact)
+           VALUES (?, ?, ?)`,
+          [userId, default_address || null, emergency_contact || null]
+        );
+      } else {
+        await conn.execute(
+          `INSERT INTO driver_profiles
+             (user_id, license_no, license_expiry, verification_status, availability, rating)
+           VALUES (?, ?, ?, 'pending', 'offline', 0.00)`,
+          [userId, license_no.trim(), license_expiry]
+        );
+      }
+
+      await conn.commit();
+
+      await logAction({
+        userId,
+        action:      'REGISTER',
+        description: `New ${role} registered: ${email}`,
+        ip:          getClientIp(req),
+      });
+
+      req.sendJSON(201, { success: true, message: 'Registration successful! Please log in.' });
+    } catch (err) {
+      await conn.rollback();
+      console.error('[auth/register]', err.message);
+      req.sendJSON(500, { success: false, message: 'Registration failed. Please try again.' });
+    } finally {
+      conn.release();
+    }
   });
 
+  // ── POST /api/auth/login ─────────────────────────────────
   router.post('/api/auth/login', async (req, res) => {
-    req.sendJSON(501, { success: false, message: 'Login endpoint coming on Day 2' });
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return req.sendJSON(400, { success: false, message: 'Email and password are required.' });
+    }
+
+    try {
+      const [rows] = await pool.execute(
+        `SELECT user_id, name, email, password, mobile, role, status
+         FROM users WHERE email = ?`,
+        [email.toLowerCase().trim()]
+      );
+
+      if (rows.length === 0) {
+        return req.sendJSON(401, { success: false, message: 'Invalid email or password.' });
+      }
+
+      const user = rows[0];
+
+      if (user.status === 'blocked') {
+        return req.sendJSON(403, { success: false, message: 'Your account has been blocked. Contact support.' });
+      }
+      if (user.status === 'inactive') {
+        return req.sendJSON(403, { success: false, message: 'Your account is inactive.' });
+      }
+      if (!verifyPassword(password, user.password)) {
+        return req.sendJSON(401, { success: false, message: 'Invalid email or password.' });
+      }
+
+      // Create 24-hour token
+      const token = createToken({
+        user_id: user.user_id,
+        name:    user.name,
+        email:   user.email,
+        role:    user.role,
+        exp:     Math.floor(Date.now() / 1000) + 86400,
+      });
+
+      await logAction({
+        userId:      user.user_id,
+        action:      'LOGIN',
+        description: `Login: ${email}`,
+        ip:          getClientIp(req),
+      });
+
+      req.sendJSON(200, {
+        success: true,
+        message: 'Login successful',
+        token,
+        user: {
+          user_id: user.user_id,
+          name:    user.name,
+          email:   user.email,
+          role:    user.role,
+        },
+      });
+    } catch (err) {
+      console.error('[auth/login]', err.message);
+      req.sendJSON(500, { success: false, message: 'Login failed. Please try again.' });
+    }
   });
 
+  // ── POST /api/auth/logout ────────────────────────────────
   router.post('/api/auth/logout', async (req, res) => {
-    req.sendJSON(200, { success: true, message: 'Logged out' });
+    // Stateless — client removes token from sessionStorage
+    req.sendJSON(200, { success: true, message: 'Logged out successfully.' });
   });
 
+  // ── GET /api/auth/me ─────────────────────────────────────
   router.get('/api/auth/me', async (req, res) => {
-    req.sendJSON(501, { success: false, message: '/me endpoint coming on Day 2' });
+    const guard = requireRole(null)(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      const [rows] = await pool.execute(
+        `SELECT user_id, name, email, mobile, role, status, created_at
+         FROM users WHERE user_id = ?`,
+        [guard.user.user_id]
+      );
+      if (rows.length === 0) {
+        return req.sendJSON(404, { success: false, message: 'User not found.' });
+      }
+      req.sendJSON(200, { success: true, user: rows[0] });
+    } catch (err) {
+      console.error('[auth/me]', err.message);
+      req.sendJSON(500, { success: false, message: 'Server error.' });
+    }
+  });
+
+  // ── GET /api/rides/search ────────────────────────────────
+  // Stub implementation for Day 2 UI — full logic on Day 3
+  router.get('/api/rides/search', async (req, res) => {
+    const { pickup, destination, type } = req.query;
+
+    if (!pickup || !destination) {
+      return req.sendJSON(400, { success: false, message: 'Pickup and destination are required.' });
+    }
+
+    try {
+      // Fetch fare options
+      let fareQuery = `SELECT * FROM fare_rules WHERE status = 'active'`;
+      const fareParams = [];
+      if (type) { fareQuery += ' AND vehicle_type = ?'; fareParams.push(type); }
+
+      const [fareRules] = await pool.execute(fareQuery, fareParams);
+
+      // Count online approved drivers
+      const [driverCount] = await pool.execute(
+        `SELECT COUNT(*) AS count FROM driver_profiles
+         WHERE availability = 'online' AND verification_status = 'approved'`
+      );
+
+      // Simulate ~5 km estimate
+      const fareOptions = fareRules.map(r => ({
+        vehicle_type:    r.vehicle_type,
+        base_fare:       parseFloat(r.base_fare),
+        per_km_rate:     parseFloat(r.per_km_rate),
+        estimated_fare:  +(parseFloat(r.base_fare) + 5 * parseFloat(r.per_km_rate)).toFixed(2),
+      }));
+
+      req.sendJSON(200, {
+        success:          true,
+        pickup,
+        destination,
+        availableDrivers: driverCount[0].count,
+        fareOptions,
+      });
+    } catch (err) {
+      console.error('[rides/search]', err.message);
+      req.sendJSON(500, { success: false, message: 'Search failed.' });
+    }
   });
 };
