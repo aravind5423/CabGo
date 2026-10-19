@@ -167,18 +167,18 @@ cab-booking/                          ← project root
 **Goal**: Passenger can search, book, track, and view trip history
 
 #### Commit 1 — `feat(api): ride search + book ride endpoints`
-- [ ] `GET /api/rides/search?pickup=&destination=&type=`
-- [ ] `POST /api/rides/book` — insert `ride_requests`, status = `pending`
-- [ ] `GET /api/rides/status/:request_id`
-- [ ] `POST /api/rides/cancel/:request_id` — only if `pending`
+- [x] `GET /api/rides/search?pickup=&destination=&type=`
+- [x] `POST /api/rides/book` — insert `ride_requests`, status = `pending`
+- [x] `GET /api/rides/status/:request_id`
+- [x] `POST /api/rides/cancel/:request_id` — only if `pending`
 
 #### Commit 2 — `feat(ui): passenger-dashboard.html + book-ride.html`
-- [ ] Dashboard: summary cards, recent bookings list (AJAX), quick actions
-- [ ] Book-ride: pickup + destination, vehicle selector, fare estimate (AJAX), confirm booking
+- [x] Dashboard: summary cards, recent bookings list (AJAX), quick actions
+- [x] Book-ride: pickup + destination, vehicle selector, fare estimate (AJAX), confirm booking
 
 #### Commit 3 — `feat(ui): active-trip.html + trip-history.html (passenger)`
-- [ ] Active trip: poll status every 5 sec via `setInterval` + Fetch, cancel button
-- [ ] Trip history: table DOM-rendered from Fetch, date filter without reload
+- [x] Active trip: poll status every 5 sec via `setInterval` + Fetch, cancel button
+- [x] Trip history: table DOM-rendered from Fetch, date filter without reload
 
 ---
 
