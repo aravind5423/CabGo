@@ -1,0 +1,16 @@
+{
+  "name": "online-cab-booking",
+  "version": "1.0.0",
+  "description": "Online Cab Booking System – Web Technology CIA Assignment",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.9.0"
+  },
+  "keywords": ["cab", "booking", "nodejs", "mysql"],
+  "author": "",
+  "license": "ISC"
+}
