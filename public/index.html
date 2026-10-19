@@ -3,72 +3,500 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🚖 CabGo — Online Cab Booking</title>
+  <title>CabGo — Fast, Safe & Affordable Cab Booking</title>
+  <meta name="description" content="Book a cab instantly with CabGo. Real-time tracking, verified drivers, and affordable fares across the city." />
+  <link rel="stylesheet" href="/css/global.css" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: hsl(220,15%,10%);
-      color: hsl(220,15%,92%);
-      font-family: 'Segoe UI', sans-serif;
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100vh;
-      text-align: center;
+    /* ── Hero ── */
+    .hero {
+      min-height: calc(100vh - 64px);
+      display: flex;
+      align-items: center;
+      padding: 5rem 0;
+      position: relative;
+      overflow: hidden;
     }
-    .card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px;
-      padding: 3rem;
-      max-width: 480px;
+    .hero::before {
+      content: '';
+      position: absolute;
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, var(--primary-glow) 0%, transparent 65%);
+      top: -200px; left: -200px;
+      border-radius: 50%;
+      pointer-events: none;
     }
-    h1 { font-size: 2.5rem; color: hsl(38,95%,55%); margin-bottom: 0.5rem; }
-    p  { color: hsl(220,10%,60%); margin-bottom: 2rem; }
-    .badge {
-      display: inline-block;
-      background: hsl(142,70%,45%);
-      color: #000;
-      font-weight: 700;
-      padding: 0.3rem 1rem;
+    .hero::after {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+      bottom: -100px; right: -100px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+      position: relative; z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-dark);
       border-radius: 999px;
+      padding: 0.35rem 1rem;
       font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
       margin-bottom: 1.5rem;
     }
-    .links a {
-      display: block;
-      margin: 0.5rem 0;
-      color: hsl(220,80%,70%);
-      text-decoration: none;
+    .hero-title {
+      font-size: clamp(2.4rem, 5vw, 3.75rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
     }
-    .links a:hover { text-decoration: underline; }
-    #api-status { margin-top: 1.5rem; font-size: 0.9rem; color: hsl(220,10%,60%); }
+    .hero-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 460px;
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .hero-stats {
+      display: flex;
+      gap: 2rem;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .hero-stat-number {
+      font-family: var(--font-heading);
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .hero-stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+    /* ── Floating Trip Card ── */
+    .hero-visual { display: flex; flex-direction: column; gap: 1rem; }
+    .trip-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 1.5rem;
+      animation: floatUp 5s ease-in-out infinite;
+    }
+    @keyframes floatUp {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+    .trip-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+    .driver-info { display: flex; align-items: center; gap: 0.75rem; }
+    .driver-avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 700; color: #fff;
+    }
+    .driver-name { font-weight: 600; font-size: 0.95rem; }
+    .driver-rating { font-size: 0.8rem; color: var(--accent); }
+    .trip-status-badge {
+      background: var(--success-light);
+      color: var(--success);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+    }
+    .route-display {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+    }
+    .route-point {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+    }
+    .route-point-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .route-dot-pickup { background: var(--success); }
+    .route-dot-drop   { background: var(--error); }
+    .route-connector  { width: 2px; height: 20px; background: var(--border); margin-left: 4px; }
+    .trip-meta {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+    .trip-meta-item {
+      flex: 1;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.75rem;
+      text-align: center;
+    }
+    .trip-meta-value { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+    .trip-meta-label { font-size: 0.75rem; color: var(--text-subtle); margin-top: 0.1rem; }
+
+    /* mini notification card */
+    .notif-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      animation: slideIn 0.5s ease 0.3s both;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .notif-icon { font-size: 1.75rem; flex-shrink: 0; }
+    .notif-text { font-size: 0.88rem; font-weight: 500; color: var(--text-muted); }
+    .notif-text strong { color: var(--text); display: block; margin-bottom: 0.1rem; }
+
+    /* ── Features Section ── */
+    .features { padding: 6rem 0; background: var(--bg-secondary); }
+    .role-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .role-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    }
+    .role-card.passenger::before { background: linear-gradient(90deg, var(--primary), var(--primary-light)); }
+    .role-card.driver::before    { background: linear-gradient(90deg, var(--accent), var(--accent-light)); }
+    .role-card.admin::before     { background: linear-gradient(90deg, var(--success), hsl(142,65%,60%)); }
+    .role-card:hover { border-color: var(--border-light); transform: translateY(-4px); box-shadow: var(--shadow); }
+    .role-icon {
+      width: 56px; height: 56px;
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 1.25rem;
+    }
+    .role-card.passenger .role-icon { background: var(--primary-glow); }
+    .role-card.driver .role-icon    { background: var(--accent-glow); }
+    .role-card.admin .role-icon     { background: var(--success-light); }
+    .role-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .role-desc  { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.6; }
+    .role-features { display: flex; flex-direction: column; gap: 0.5rem; }
+    .role-feature-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .role-feature-item::before {
+      content: '✓';
+      color: var(--success);
+      font-weight: 700;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    /* ── How it works ── */
+    .how-it-works { padding: 6rem 0; }
+    .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; position: relative; }
+    .steps-grid::before {
+      content: '';
+      position: absolute;
+      top: 36px; left: calc(16.66% + 1rem); right: calc(16.66% + 1rem);
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      z-index: 0;
+    }
+    .step-card {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .step-number {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      font-family: var(--font-heading);
+      font-size: 1.5rem;
+      font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: var(--shadow-primary);
+    }
+    .step-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .step-desc  { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* ── CTA Banner ── */
+    .cta-banner {
+      padding: 5rem 0;
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg) 100%);
+    }
+    .cta-inner {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      border-radius: var(--radius-2xl);
+      padding: 3.5rem 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-inner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .cta-inner h2 { color: #fff; font-size: 2.25rem; margin-bottom: 0.75rem; position: relative; }
+    .cta-inner p  { color: rgba(255,255,255,0.75); font-size: 1.05rem; margin-bottom: 2rem; position: relative; }
+    .cta-actions  { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; position: relative; }
+    .btn-white {
+      background: #fff;
+      color: var(--primary-dark);
+      font-weight: 700;
+      padding: 0.85rem 2rem;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      transition: all var(--t);
+    }
+    .btn-white:hover { background: rgba(255,255,255,0.9); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .btn-white-outline {
+      background: transparent;
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.5);
+      font-weight: 700;
+      padding: 0.85rem 2rem;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      transition: all var(--t);
+    }
+    .btn-white-outline:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .steps-grid::before { display: none; }
+      .cta-inner { padding: 2.5rem 1.5rem; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="badge">✅ Day 1 — Server Running</div>
-    <h1>🚖 CabGo</h1>
-    <p>Online Cab Booking System — Web Technology CIA Assignment</p>
 
-    <div class="links">
-      <a href="/login.html">→ Login</a>
-      <a href="/register.html">→ Register</a>
-      <a href="/search-ride.html">→ Search Rides</a>
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="navbar-logo">🚖 Cab<span>Go</span></a>
+    <div class="navbar-links">
+      <a href="/search-ride.html" class="btn btn-ghost btn-sm">Search Rides</a>
+      <a href="/login.html"    class="btn btn-outline btn-sm">Log In</a>
+      <a href="/register.html" class="btn btn-accent btn-sm">Get Started</a>
     </div>
-
-    <div id="api-status">Checking API…</div>
   </div>
+</nav>
 
-  <script>
-    fetch('/api/health')
-      .then(r => r.json())
-      .then(d => {
-        document.getElementById('api-status').textContent = '✅ ' + d.message;
-        document.getElementById('api-status').style.color = 'hsl(142,70%,55%)';
-      })
-      .catch(() => {
-        document.getElementById('api-status').textContent = '❌ API not reachable';
-        document.getElementById('api-status').style.color = 'hsl(0,75%,55%)';
-      });
-  </script>
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-content">
+        <div class="hero-badge">🚀 Now available across all major cities</div>
+        <h1 class="hero-title">
+          Your Ride,<br/>
+          <span class="text-gradient">Your Way</span>
+        </h1>
+        <p class="hero-subtitle">
+          Book a cab in seconds. Real-time tracking, verified drivers,
+          and transparent fares — every single time.
+        </p>
+        <div class="hero-actions">
+          <a href="/register.html" class="btn btn-accent btn-lg">Book Your First Ride</a>
+          <a href="/search-ride.html" class="btn btn-outline btn-lg">Search Rides</a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-number">10K+</div>
+            <div class="hero-stat-label">Happy Riders</div>
+          </div>
+          <div>
+            <div class="hero-stat-number">500+</div>
+            <div class="hero-stat-label">Verified Drivers</div>
+          </div>
+          <div>
+            <div class="hero-stat-number">4.8★</div>
+            <div class="hero-stat-label">Average Rating</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="trip-card">
+          <div class="trip-card-header">
+            <div class="driver-info">
+              <div class="driver-avatar">RK</div>
+              <div>
+                <div class="driver-name">Raju Kumar</div>
+                <div class="driver-rating">⭐ 4.9 · Honda City</div>
+              </div>
+            </div>
+            <span class="trip-status-badge">● On the way</span>
+          </div>
+          <div class="route-display">
+            <div class="route-point">
+              <div class="route-point-dot route-dot-pickup"></div>
+              <span>Koramangala, Bangalore</span>
+            </div>
+            <div class="route-connector" style="margin-left:4px;"></div>
+            <div class="route-point">
+              <div class="route-point-dot route-dot-drop"></div>
+              <span>Whitefield, Bangalore</span>
+            </div>
+          </div>
+          <div class="trip-meta">
+            <div class="trip-meta-item">
+              <div class="trip-meta-value">₹185</div>
+              <div class="trip-meta-label">Estimated</div>
+            </div>
+            <div class="trip-meta-item">
+              <div class="trip-meta-value">12 km</div>
+              <div class="trip-meta-label">Distance</div>
+            </div>
+            <div class="trip-meta-item">
+              <div class="trip-meta-value">22 min</div>
+              <div class="trip-meta-label">ETA</div>
+            </div>
+          </div>
+        </div>
+        <div class="notif-card">
+          <div class="notif-icon">🎉</div>
+          <div class="notif-text">
+            <strong>Trip Completed!</strong>
+            Rate your experience with Raju Kumar
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features / Roles -->
+<section class="features">
+  <div class="container">
+    <h2 class="section-title">Built for <span class="text-gradient">Everyone</span></h2>
+    <p class="section-subtitle">Whether you need a ride or drive for a living, CabGo has the tools you need.</p>
+    <div class="grid-3">
+      <div class="role-card passenger">
+        <div class="role-icon">🧑‍💼</div>
+        <div class="role-title">Passengers</div>
+        <p class="role-desc">Book rides instantly, track in real-time, pay seamlessly and rate your driver.</p>
+        <div class="role-features">
+          <div class="role-feature-item">Instant cab booking</div>
+          <div class="role-feature-item">Real-time driver tracking</div>
+          <div class="role-feature-item">Fare estimate before booking</div>
+          <div class="role-feature-item">Trip history & receipts</div>
+          <div class="role-feature-item">Rate & review drivers</div>
+        </div>
+      </div>
+      <div class="role-card driver">
+        <div class="role-icon">🚗</div>
+        <div class="role-title">Drivers</div>
+        <p class="role-desc">Earn more with flexible hours, manage your availability and grow your income.</p>
+        <div class="role-features">
+          <div class="role-feature-item">Go online/offline anytime</div>
+          <div class="role-feature-item">Accept or reject ride requests</div>
+          <div class="role-feature-item">Real-time earnings dashboard</div>
+          <div class="role-feature-item">Manage vehicle details</div>
+          <div class="role-feature-item">View ratings & reviews</div>
+        </div>
+      </div>
+      <div class="role-card admin">
+        <div class="role-icon">🛡️</div>
+        <div class="role-title">Admins</div>
+        <p class="role-desc">Full control over the platform — manage users, trips, fares and system health.</p>
+        <div class="role-features">
+          <div class="role-feature-item">Manage drivers & passengers</div>
+          <div class="role-feature-item">Approve/block accounts</div>
+          <div class="role-feature-item">Configure fare rules</div>
+          <div class="role-feature-item">Monitor trips & revenue</div>
+          <div class="role-feature-item">System logs & audit trail</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="how-it-works section">
+  <div class="container">
+    <h2 class="section-title">How It <span class="text-gradient">Works</span></h2>
+    <p class="section-subtitle">Get a cab in 3 simple steps — no hassle, no waiting.</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <div class="step-title">Search Your Ride</div>
+        <p class="step-desc">Enter pickup and destination. View available drivers and estimated fares instantly.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <div class="step-title">Confirm Booking</div>
+        <p class="step-desc">Choose your vehicle type, confirm the booking and your driver heads your way.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <div class="step-title">Arrive & Rate</div>
+        <p class="step-desc">Complete your trip, pay with your preferred method, and leave a rating.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Banner -->
+<section class="cta-banner">
+  <div class="container">
+    <div class="cta-inner">
+      <h2>Ready to Hit the Road?</h2>
+      <p>Join thousands of happy riders. Your first ride is just a tap away.</p>
+      <div class="cta-actions">
+        <a href="/register.html?role=passenger" class="btn-white">🧑‍💼 Sign Up as Passenger</a>
+        <a href="/register.html?role=driver"    class="btn-white-outline">🚗 Register as Driver</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>© 2026 CabGo · Online Cab Booking System · Web Technology CIA Assignment</p>
+</footer>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
 </body>
 </html>

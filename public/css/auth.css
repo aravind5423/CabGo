@@ -1,1 +1,236 @@
-/* TODO */
+/* public/css/auth.css — Login, Register, Search-Ride page styles */
+
+/* ── Auth Page Wrapper ───────────────────────────────────── */
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Brand Panel (left side) ─────────────────────────────── */
+.auth-brand {
+  background: linear-gradient(145deg, hsl(222, 25%, 11%) 0%, hsl(220, 30%, 14%) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3rem 4rem;
+  position: relative;
+  overflow: hidden;
+}
+.auth-brand::before {
+  content: '';
+  position: absolute;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, var(--primary-glow) 0%, transparent 65%);
+  top: -100px; left: -150px;
+  border-radius: 50%;
+}
+.auth-brand::after {
+  content: '';
+  position: absolute;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+  bottom: -80px; right: -80px;
+  border-radius: 50%;
+}
+
+.auth-brand-logo {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 2.5rem;
+  position: relative; z-index: 1;
+}
+.auth-brand-logo span { color: var(--accent); }
+
+.auth-brand-title {
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+  position: relative; z-index: 1;
+}
+
+.auth-brand-subtitle {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  max-width: 380px;
+  margin-bottom: 2.5rem;
+  position: relative; z-index: 1;
+}
+
+.auth-brand-features {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative; z-index: 1;
+}
+
+.auth-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.auth-feature-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* ── Illustration / Animated taxi ───────────────────────── */
+.auth-illustration {
+  position: relative; z-index: 1;
+  margin-top: 3rem;
+  width: 100%;
+  max-width: 340px;
+}
+.taxi-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+  animation: floatCard 4s ease-in-out infinite;
+}
+@keyframes floatCard {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+.taxi-emoji { font-size: 3.5rem; margin-bottom: 0.75rem; display: block; }
+.taxi-route {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.taxi-route-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.taxi-route-dot.pickup { background: var(--success); }
+.taxi-route-dot.drop   { background: var(--error); }
+.taxi-route-line {
+  width: 1px; height: 24px;
+  background: var(--border);
+  margin: 2px 0 2px 3px;
+}
+.taxi-fare {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 0.75rem;
+}
+
+/* ── Auth Form Panel (right side) ────────────────────────── */
+.auth-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem 2rem;
+  background: var(--bg-secondary);
+  overflow-y: auto;
+}
+
+.auth-form-box {
+  width: 100%;
+  max-width: 440px;
+}
+
+.auth-form-header {
+  margin-bottom: 2rem;
+}
+.auth-form-header h2 {
+  font-size: 1.85rem;
+  margin-bottom: 0.4rem;
+}
+.auth-form-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ── Tabs (Register) ─────────────────────────────────────── */
+.auth-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 0.25rem;
+  margin-bottom: 1.75rem;
+}
+.auth-tab {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--t);
+  border: none;
+  background: none;
+}
+.auth-tab.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-primary);
+}
+
+/* ── Password input wrapper ──────────────────────────────── */
+.input-wrapper {
+  position: relative;
+}
+.input-wrapper .form-control { padding-right: 2.8rem; }
+.toggle-password {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  transition: color var(--t);
+}
+.toggle-password:hover { color: var(--text-muted); }
+
+/* ── Auth footer link ────────────────────────────────────── */
+.auth-switch {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.auth-switch a { color: var(--primary-light); font-weight: 500; }
+.auth-switch a:hover { color: var(--primary); }
+
+/* ── Global alert inside form ────────────────────────────── */
+#form-alert {
+  display: none;
+  margin-bottom: 1rem;
+}
+#form-alert.show { display: flex; }
+
+/* ── Responsive: stack on mobile ────────────────────────── */
+@media (max-width: 900px) {
+  .auth-page { grid-template-columns: 1fr; }
+  .auth-brand { display: none; }
+  .auth-form-panel { padding: 2rem 1.5rem; }
+}

@@ -1,1 +1,112 @@
-<!-- TODO: login -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log In — CabGo</title>
+  <meta name="description" content="Log in to CabGo to book rides, manage trips, or access your driver/admin dashboard." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+
+<div class="auth-page">
+
+  <!-- Left: Brand Panel -->
+  <div class="auth-brand">
+    <a href="/" class="auth-brand-logo">🚖 Cab<span>Go</span></a>
+    <h2 class="auth-brand-title">Welcome<br/><span class="text-gradient">Back!</span></h2>
+    <p class="auth-brand-subtitle">Log in to continue your journey. Your driver is waiting.</p>
+    <div class="auth-brand-features">
+      <div class="auth-feature">
+        <div class="auth-feature-icon">⚡</div>
+        <span>Book a cab in under 60 seconds</span>
+      </div>
+      <div class="auth-feature">
+        <div class="auth-feature-icon">🛡️</div>
+        <span>Verified drivers, safe rides</span>
+      </div>
+      <div class="auth-feature">
+        <div class="auth-feature-icon">💰</div>
+        <span>Transparent fares, no surprises</span>
+      </div>
+    </div>
+    <div class="auth-illustration">
+      <div class="taxi-card">
+        <span class="taxi-emoji">🚖</span>
+        <div class="taxi-route">
+          <div class="taxi-route-dot pickup"></div>
+          <span>Airport Terminal 1</span>
+        </div>
+        <div style="margin-left:3px;"><div class="taxi-route-line"></div></div>
+        <div class="taxi-route">
+          <div class="taxi-route-dot drop"></div>
+          <span>City Centre Hotel</span>
+        </div>
+        <div class="taxi-fare">₹ 320</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Form Panel -->
+  <div class="auth-form-panel">
+    <div class="auth-form-box">
+      <div class="auth-form-header">
+        <h2>Sign In</h2>
+        <p>Enter your credentials to access your account</p>
+      </div>
+
+      <div id="form-alert" class="alert" role="alert"></div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            class="form-control"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrapper">
+            <input
+              type="password"
+              id="password"
+              class="form-control"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+            <button type="button" id="toggle-password" class="toggle-password" aria-label="Toggle password">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" id="login-btn" class="btn btn-primary btn-full btn-lg" style="margin-top:0.5rem;">
+          Sign In
+        </button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <a href="/search-ride.html" class="btn btn-outline btn-full">
+        🔍 Search Rides Without Login
+      </a>
+
+      <p class="auth-switch">
+        Don't have an account? <a href="/register.html">Create one free</a>
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script src="/js/auth.js"></script>
+</body>
+</html>
