@@ -25,18 +25,18 @@ if (fs.existsSync(envPath)) {
 }
 
 // ── Route handlers ───────────────────────────────────────────
-const Router    = require('./router');
-const authRoute = require('./routes/auth');
-// Day 3+ routes will be imported here:
-// const passengerRoute = require('./routes/passenger');
+const Router         = require('./router');
+const authRoute      = require('./routes/auth');
+const passengerRoute = require('./routes/passenger');
+// Day 4+ routes:
 // const driverRoute    = require('./routes/driver');
 // const adminRoute     = require('./routes/admin');
 // const superRoute     = require('./routes/superadmin');
 
 const router = new Router();
 authRoute(router);
-// Day 3+:
-// passengerRoute(router);
+passengerRoute(router);
+// Day 4+:
 // driverRoute(router);
 // adminRoute(router);
 // superRoute(router);
