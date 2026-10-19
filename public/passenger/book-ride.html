@@ -1,1 +1,384 @@
-<!-- TODO: book ride -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book a Ride — CabGo</title>
+  <meta name="description" content="Book your cab instantly with transparent pricing and live driver tracking." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <script src="/js/router-guard.js" data-role="passenger"></script>
+</head>
+<body class="app-layout">
+
+  <div class="app-main">
+    <!-- Navbar -->
+    <header class="dash-navbar">
+      <a href="/passenger/dashboard.html" class="dash-brand">
+        <div class="dash-brand-icon">🚖</div>
+        <span>CabGo</span>
+      </a>
+
+      <nav>
+        <ul class="dash-nav-links">
+          <li><a href="/passenger/dashboard.html" class="dash-nav-link"><span>📊</span> Dashboard</a></li>
+          <li><a href="/passenger/book-ride.html" class="dash-nav-link active"><span>📍</span> Book Ride</a></li>
+          <li><a href="/passenger/active-trip.html" class="dash-nav-link"><span>⚡</span> Active Trip</a></li>
+          <li><a href="/passenger/trip-history.html" class="dash-nav-link"><span>📜</span> History</a></li>
+          <li><a href="/passenger/profile.html" class="dash-nav-link"><span>👤</span> Profile</a></li>
+        </ul>
+      </nav>
+
+      <div class="dash-user-menu">
+        <div class="dash-user-badge">
+          <div class="user-avatar-circle" id="userAvatar">P</div>
+          <span id="userName" style="font-weight: 500;">Passenger</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm" style="padding: 0.35rem 0.75rem;">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-container">
+      <div class="dash-header">
+        <div class="dash-header-title">
+          <h1>Book Your Ride</h1>
+          <p>Select your route, vehicle type, and see your upfront fare estimate.</p>
+        </div>
+      </div>
+
+      <!-- 2-Column Grid -->
+      <div class="dash-grid-2" style="align-items: start;">
+        
+        <!-- Left: Form -->
+        <section class="dash-card">
+          <h2 class="dash-card-title"><span>🗺️</span> Ride Details</h2>
+          
+          <form id="bookRideForm" style="margin-top: 1.25rem;">
+            <!-- Pickup -->
+            <div class="form-group">
+              <label for="pickupInput">Pickup Location <span style="color: #F87171;">*</span></label>
+              <div class="input-icon-wrap">
+                <span class="input-icon">🟢</span>
+                <input
+                  type="text"
+                  id="pickupInput"
+                  class="form-control"
+                  placeholder="Enter pickup address, airport, or landmark"
+                  required
+                />
+              </div>
+              <!-- Quick suggestions -->
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <span style="font-size: 0.75rem; color: #94A3B8; align-self: center;">Quick:</span>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="pickup" data-val="Central Railway Station" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Central Station</button>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="pickup" data-val="International Airport Terminal 2" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Airport T2</button>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="pickup" data-val="Cyber City Tech Park" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Tech Park</button>
+              </div>
+            </div>
+
+            <!-- Destination -->
+            <div class="form-group" style="margin-top: 1.25rem;">
+              <label for="destinationInput">Destination <span style="color: #F87171;">*</span></label>
+              <div class="input-icon-wrap">
+                <span class="input-icon">🔴</span>
+                <input
+                  type="text"
+                  id="destinationInput"
+                  class="form-control"
+                  placeholder="Where do you want to go?"
+                  required
+                />
+              </div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <span style="font-size: 0.75rem; color: #94A3B8; align-self: center;">Quick:</span>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="dest" data-val="Downtown Grand Mall" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Grand Mall</button>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="dest" data-val="City General Hospital" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Hospital</button>
+                <button type="button" class="btn btn-outline btn-sm quick-loc-btn" data-target="dest" data-val="University Campus North Gate" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">University</button>
+              </div>
+            </div>
+
+            <!-- Vehicle Type Selection -->
+            <div class="form-group" style="margin-top: 1.5rem;">
+              <label>Select Vehicle Type <span style="color: #F87171;">*</span></label>
+              <div class="vehicle-selector-grid" id="vehicleGrid">
+                
+                <div class="vehicle-select-card selected" data-type="sedan" data-base="100" data-rate="18">
+                  <div class="vehicle-card-icon">🚗</div>
+                  <div class="vehicle-card-name">Sedan</div>
+                  <div style="font-size: 0.72rem; color: #94A3B8;">4 Seats • AC</div>
+                  <div class="vehicle-card-fare" id="fare-sedan">₹190.00</div>
+                </div>
+
+                <div class="vehicle-select-card" data-type="suv" data-base="150" data-rate="25">
+                  <div class="vehicle-card-icon">🚙</div>
+                  <div class="vehicle-card-name">SUV</div>
+                  <div style="font-size: 0.72rem; color: #94A3B8;">6 Seats • Luxury</div>
+                  <div class="vehicle-card-fare" id="fare-suv">₹275.00</div>
+                </div>
+
+                <div class="vehicle-select-card" data-type="hatchback" data-base="80" data-rate="14">
+                  <div class="vehicle-card-icon">🚕</div>
+                  <div class="vehicle-card-name">Hatchback</div>
+                  <div style="font-size: 0.72rem; color: #94A3B8;">4 Seats • Budget</div>
+                  <div class="vehicle-card-fare" id="fare-hatchback">₹150.00</div>
+                </div>
+
+                <div class="vehicle-select-card" data-type="auto" data-base="40" data-rate="10">
+                  <div class="vehicle-card-icon">🛺</div>
+                  <div class="vehicle-card-name">Auto</div>
+                  <div style="font-size: 0.72rem; color: #94A3B8;">3 Seats • Fast</div>
+                  <div class="vehicle-card-fare" id="fare-auto">₹90.00</div>
+                </div>
+
+                <div class="vehicle-select-card" data-type="bike" data-base="25" data-rate="7">
+                  <div class="vehicle-card-icon">🏍️</div>
+                  <div class="vehicle-card-name">Bike</div>
+                  <div style="font-size: 0.72rem; color: #94A3B8;">1 Seat • Solo</div>
+                  <div class="vehicle-card-fare" id="fare-bike">₹60.00</div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="form-group" style="margin-top: 1.25rem;">
+              <label for="paymentMethod">Payment Method</label>
+              <select id="paymentMethod" class="form-control">
+                <option value="cash">💵 Cash to Driver</option>
+                <option value="card">💳 Credit / Debit Card</option>
+                <option value="wallet">📱 CabGo Wallet / UPI</option>
+              </select>
+            </div>
+          </form>
+        </section>
+
+        <!-- Right: Fare Summary & Confirmation -->
+        <section class="dash-card">
+          <h2 class="dash-card-title"><span>🧾</span> Fare Estimate</h2>
+
+          <div style="margin-top: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; margin-bottom: 1.25rem;">
+              <span style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: #10B981;">
+                <span class="active-pulse-badge" style="background: #10B981;"></span>
+                <span id="driversAvailableText">Nearby Drivers Online</span>
+              </span>
+              <strong style="color: #10B981; font-size: 0.95rem;" id="driverCountDisplay">Active</strong>
+            </div>
+
+            <!-- Route Summary -->
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid rgba(255, 255, 255, 0.06);">
+              <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <span style="font-size: 1.1rem;">📍</span>
+                <div>
+                  <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8;">From</div>
+                  <div style="font-weight: 600; color: #fff;" id="summaryPickup">Select pickup location</div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                <span style="font-size: 1.1rem;">🏁</span>
+                <div>
+                  <div style="font-size: 0.75rem; text-transform: uppercase; color: #94A3B8;">To</div>
+                  <div style="font-weight: 600; color: #fff;" id="summaryDest">Select destination</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fare Breakdown Box -->
+            <div class="fare-estimate-box">
+              <div class="fare-row">
+                <span>Vehicle Selected</span>
+                <strong id="summaryVehicleType" style="color: #fff; text-transform: capitalize;">Sedan</strong>
+              </div>
+              <div class="fare-row">
+                <span>Estimated Distance</span>
+                <strong id="summaryDistance" style="color: #fff;">~5.0 km</strong>
+              </div>
+              <div class="fare-row">
+                <span>Base Fare</span>
+                <strong id="summaryBaseFare" style="color: #fff;">₹100.00</strong>
+              </div>
+              <div class="fare-row">
+                <span>Distance Charges</span>
+                <strong id="summaryDistFare" style="color: #fff;">₹90.00</strong>
+              </div>
+              <div class="fare-row total">
+                <span>Total Estimated Fare</span>
+                <span class="fare-amount" id="summaryTotalFare">₹190.00</span>
+              </div>
+            </div>
+
+            <!-- Book CTA Button -->
+            <button id="confirmBookBtn" class="btn btn-primary btn-block btn-lg" style="margin-top: 1.25rem;">
+              <span>🚖 Confirm & Request Ride</span>
+            </button>
+
+            <div style="text-align: center; margin-top: 0.85rem; font-size: 0.78rem; color: #64748B;">
+              🔒 Upfront pricing • No surge multipliers applied
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Setup user badge
+      const userName = sessionStorage.getItem('user_name') || 'Passenger';
+      document.getElementById('userName').textContent = userName;
+      document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = '/login.html';
+      });
+
+      // State
+      let selectedType = 'sedan';
+      let currentEstimateFare = 190.00;
+      let calculatedKm = 5.0;
+
+      const pickupInput = document.getElementById('pickupInput');
+      const destInput = document.getElementById('destinationInput');
+      const vehicleCards = document.querySelectorAll('.vehicle-select-card');
+      const confirmBookBtn = document.getElementById('confirmBookBtn');
+
+      // Check URL search params for prefill (e.g. from index or search page)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('pickup')) pickupInput.value = urlParams.get('pickup');
+      if (urlParams.get('destination')) destInput.value = urlParams.get('destination');
+      if (urlParams.get('type')) selectVehicle(urlParams.get('type'));
+
+      // Quick location helper buttons
+      document.querySelectorAll('.quick-loc-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.target;
+          const val = btn.dataset.val;
+          if (target === 'pickup') pickupInput.value = val;
+          else destInput.value = val;
+          updateFareCalculation();
+        });
+      });
+
+      // Vehicle selection handler
+      vehicleCards.forEach(card => {
+        card.addEventListener('click', () => {
+          vehicleCards.forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedType = card.dataset.type;
+          updateFareCalculation();
+        });
+      });
+
+      function selectVehicle(type) {
+        const found = Array.from(vehicleCards).find(c => c.dataset.type === type.toLowerCase());
+        if (found) {
+          vehicleCards.forEach(c => c.classList.remove('selected'));
+          found.classList.add('selected');
+          selectedType = type.toLowerCase();
+        }
+      }
+
+      // Live fare estimation
+      async function updateFareCalculation() {
+        const p = pickupInput.value.trim();
+        const d = destInput.value.trim();
+
+        document.getElementById('summaryPickup').textContent = p || 'Select pickup location';
+        document.getElementById('summaryDest').textContent = d || 'Select destination';
+        document.getElementById('summaryVehicleType').textContent = selectedType;
+
+        if (!p || !d) {
+          return;
+        }
+
+        try {
+          const res = await API.get(`/api/rides/search?pickup=${encodeURIComponent(p)}&destination=${encodeURIComponent(d)}&type=${selectedType}`);
+          if (res.success && res.fareOptions && res.fareOptions.length > 0) {
+            const opt = res.fareOptions[0];
+            calculatedKm = opt.estimated_km || 5.0;
+            currentEstimateFare = opt.estimated_fare;
+
+            document.getElementById('summaryDistance').textContent = `~${calculatedKm} km`;
+            document.getElementById('summaryBaseFare').textContent = `₹${parseFloat(opt.base_fare).toFixed(2)}`;
+            const distCharge = +(calculatedKm * opt.per_km_rate).toFixed(2);
+            document.getElementById('summaryDistFare').textContent = `₹${distCharge.toFixed(2)}`;
+            document.getElementById('summaryTotalFare').textContent = `₹${currentEstimateFare.toFixed(2)}`;
+
+            if (res.availableDrivers !== undefined) {
+              document.getElementById('driverCountDisplay').textContent = `${res.availableDrivers} Online`;
+            }
+          }
+        } catch {
+          // Fallback to local rate calculation if offline
+          const selectedCard = document.querySelector(`.vehicle-select-card[data-type="${selectedType}"]`);
+          const base = parseFloat(selectedCard?.dataset.base || 100);
+          const rate = parseFloat(selectedCard?.dataset.rate || 18);
+          currentEstimateFare = +(base + 5 * rate).toFixed(2);
+          document.getElementById('summaryTotalFare').textContent = `₹${currentEstimateFare.toFixed(2)}`;
+        }
+      }
+
+      pickupInput.addEventListener('input', debounce(updateFareCalculation, 400));
+      destInput.addEventListener('input', debounce(updateFareCalculation, 400));
+
+      function debounce(fn, ms) {
+        let timer;
+        return function (...args) {
+          clearTimeout(timer);
+          timer = setTimeout(() => fn.apply(this, args), ms);
+        };
+      }
+
+      // Initial fare check if inputs exist
+      if (pickupInput.value && destInput.value) {
+        updateFareCalculation();
+      }
+
+      // Handle Booking Submission
+      confirmBookBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const pickup = pickupInput.value.trim();
+        const destination = destInput.value.trim();
+
+        if (!pickup || !destination) {
+          API.toast('Please provide both pickup and destination locations.', 'error');
+          return;
+        }
+
+        confirmBookBtn.disabled = true;
+        confirmBookBtn.innerHTML = '<span>⏳ Requesting Ride...</span>';
+
+        try {
+          const res = await API.post('/api/rides/book', {
+            pickup_location: pickup,
+            destination:     destination,
+            vehicle_type:    selectedType,
+            estimated_fare:  currentEstimateFare,
+          });
+
+          if (res.success) {
+            API.toast('Ride booked successfully! Connecting to drivers...', 'success');
+            setTimeout(() => {
+              window.location.href = `/passenger/active-trip.html?id=${res.request_id}`;
+            }, 800);
+          } else {
+            API.toast(res.message || 'Booking failed.', 'error');
+            confirmBookBtn.disabled = false;
+            confirmBookBtn.innerHTML = '<span>🚖 Confirm & Request Ride</span>';
+          }
+        } catch (err) {
+          API.toast('Network error while booking ride.', 'error');
+          confirmBookBtn.disabled = false;
+          confirmBookBtn.innerHTML = '<span>🚖 Confirm & Request Ride</span>';
+        }
+      });
+
+    });
+  </script>
+</body>
+</html>

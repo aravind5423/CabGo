@@ -1,1 +1,278 @@
-<!-- TODO: dashboard -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Passenger Dashboard — CabGo</title>
+  <meta name="description" content="View your ride statistics, active trips, and recent bookings on CabGo." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <!-- Role Guard: Only passengers allowed -->
+  <script src="/js/router-guard.js" data-role="passenger"></script>
+</head>
+<body class="app-layout">
+
+  <div class="app-main">
+    <!-- Navbar -->
+    <header class="dash-navbar">
+      <a href="/passenger/dashboard.html" class="dash-brand">
+        <div class="dash-brand-icon">🚖</div>
+        <span>CabGo</span>
+      </a>
+
+      <nav>
+        <ul class="dash-nav-links">
+          <li><a href="/passenger/dashboard.html" class="dash-nav-link active"><span>📊</span> Dashboard</a></li>
+          <li><a href="/passenger/book-ride.html" class="dash-nav-link"><span>📍</span> Book Ride</a></li>
+          <li><a href="/passenger/active-trip.html" class="dash-nav-link"><span>⚡</span> Active Trip</a></li>
+          <li><a href="/passenger/trip-history.html" class="dash-nav-link"><span>📜</span> History</a></li>
+          <li><a href="/passenger/profile.html" class="dash-nav-link"><span>👤</span> Profile</a></li>
+        </ul>
+      </nav>
+
+      <div class="dash-user-menu">
+        <div class="dash-user-badge">
+          <div class="user-avatar-circle" id="userAvatar">P</div>
+          <span id="userName" style="font-weight: 500;">Passenger</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm" style="padding: 0.35rem 0.75rem;">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-container">
+      
+      <!-- Header -->
+      <section class="dash-header">
+        <div class="dash-header-title">
+          <h1 id="welcomeHeading">Welcome back! 👋</h1>
+          <p>Here is what's happening with your rides today.</p>
+        </div>
+        <div class="dash-header-actions">
+          <button id="refreshBtn" class="btn btn-outline btn-sm">
+            <span>🔄 Refresh</span>
+          </button>
+          <a href="/passenger/book-ride.html" class="btn btn-primary btn-sm">
+            <span>+ Book New Ride</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- Active Ride Alert Banner (Dynamic) -->
+      <section id="activeRideContainer" style="display: none;"></section>
+
+      <!-- KPI Stat Cards -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-info">
+            <h3>Total Bookings</h3>
+            <p class="kpi-value" id="statTotalRides">—</p>
+          </div>
+          <div class="kpi-icon kpi-indigo">🚗</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-info">
+            <h3>Completed Rides</h3>
+            <p class="kpi-value" id="statCompletedRides">—</p>
+          </div>
+          <div class="kpi-icon kpi-emerald">✅</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-info">
+            <h3>Total Spent</h3>
+            <p class="kpi-value" id="statTotalSpent">₹0.00</p>
+          </div>
+          <div class="kpi-icon kpi-amber">💰</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-info">
+            <h3>Cancelled</h3>
+            <p class="kpi-value" id="statCancelledRides">—</p>
+          </div>
+          <div class="kpi-icon kpi-rose">❌</div>
+        </div>
+      </section>
+
+      <!-- Quick Actions Grid -->
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <a href="/passenger/book-ride.html" class="dash-card" style="text-decoration: none; display: flex; align-items: center; gap: 1rem; padding: 1.25rem; transition: transform 0.2s;">
+          <div style="font-size: 2rem; background: rgba(245, 158, 11, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">📍</div>
+          <div>
+            <div style="font-weight: 700; color: #fff; margin-bottom: 0.2rem;">Book a Cab</div>
+            <div style="font-size: 0.8rem; color: #94A3B8;">Get ride in minutes</div>
+          </div>
+        </a>
+
+        <a href="/passenger/active-trip.html" class="dash-card" style="text-decoration: none; display: flex; align-items: center; gap: 1rem; padding: 1.25rem; transition: transform 0.2s;">
+          <div style="font-size: 2rem; background: rgba(99, 102, 241, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">⚡</div>
+          <div>
+            <div style="font-weight: 700; color: #fff; margin-bottom: 0.2rem;">Active Ride</div>
+            <div style="font-size: 0.8rem; color: #94A3B8;">Track driver status</div>
+          </div>
+        </a>
+
+        <a href="/passenger/trip-history.html" class="dash-card" style="text-decoration: none; display: flex; align-items: center; gap: 1rem; padding: 1.25rem; transition: transform 0.2s;">
+          <div style="font-size: 2rem; background: rgba(16, 185, 129, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">📜</div>
+          <div>
+            <div style="font-weight: 700; color: #fff; margin-bottom: 0.2rem;">Ride History</div>
+            <div style="font-size: 0.8rem; color: #94A3B8;">View past receipts</div>
+          </div>
+        </a>
+
+        <a href="/passenger/profile.html" class="dash-card" style="text-decoration: none; display: flex; align-items: center; gap: 1rem; padding: 1.25rem; transition: transform 0.2s;">
+          <div style="font-size: 2rem; background: rgba(244, 63, 94, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">👤</div>
+          <div>
+            <div style="font-weight: 700; color: #fff; margin-bottom: 0.2rem;">My Profile</div>
+            <div style="font-size: 0.8rem; color: #94A3B8;">Addresses & settings</div>
+          </div>
+        </a>
+      </section>
+
+      <!-- Recent Rides Table Card -->
+      <section class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title"><span>🕒</span> Recent Bookings</h2>
+          <a href="/passenger/trip-history.html" class="btn btn-outline btn-sm">View All</a>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data-table" id="recentRidesTable">
+            <thead>
+              <tr>
+                <th>Booking #</th>
+                <th>Pickup Location</th>
+                <th>Destination</th>
+                <th>Vehicle</th>
+                <th>Fare</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentRidesBody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem; color: #94A3B8;">
+                  Loading your ride data...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Populate user info
+      const userName = sessionStorage.getItem('user_name') || 'Passenger';
+      document.getElementById('userName').textContent = userName;
+      document.getElementById('welcomeHeading').textContent = `Welcome back, ${userName.split(' ')[0]}! 👋`;
+      document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+
+      // 2. Setup Logout
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        sessionStorage.clear();
+        API.toast('Logged out successfully', 'info');
+        setTimeout(() => window.location.href = '/login.html', 400);
+      });
+
+      // 3. Fetch Dashboard data
+      async function loadDashboard() {
+        try {
+          const res = await API.get('/api/passenger/dashboard');
+          if (!res.success) {
+            API.toast(res.message || 'Failed to load dashboard data', 'error');
+            return;
+          }
+
+          // Render stats
+          const stats = res.stats || {};
+          document.getElementById('statTotalRides').textContent = stats.total_rides || 0;
+          document.getElementById('statCompletedRides').textContent = stats.completed_rides || 0;
+          document.getElementById('statCancelledRides').textContent = stats.cancelled_rides || 0;
+          document.getElementById('statTotalSpent').textContent = `₹${parseFloat(stats.total_spent || 0).toFixed(2)}`;
+
+          // Render Active Ride Banner
+          const activeContainer = document.getElementById('activeRideContainer');
+          if (res.activeRide) {
+            const r = res.activeRide;
+            activeContainer.style.display = 'block';
+            activeContainer.innerHTML = `
+              <div class="active-ride-banner">
+                <div class="active-ride-left">
+                  <span class="active-pulse-badge"></span>
+                  <div>
+                    <div style="font-weight: 700; color: #fff; font-size: 1.05rem; margin-bottom: 0.2rem;">
+                      Active Ride #${r.request_id} — <span style="text-transform: uppercase; color: #F59E0B;">${r.status}</span>
+                    </div>
+                    <div style="font-size: 0.88rem; color: #94A3B8;">
+                      From <strong style="color: #fff;">${r.pickup_location}</strong> to <strong style="color: #fff;">${r.destination}</strong>
+                      (${r.vehicle_type.toUpperCase()} • ₹${parseFloat(r.estimated_fare).toFixed(2)})
+                    </div>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                  <a href="/passenger/active-trip.html?id=${r.request_id}" class="btn btn-primary btn-sm">
+                    ⚡ Track Live Ride
+                  </a>
+                </div>
+              </div>
+            `;
+          } else {
+            activeContainer.style.display = 'none';
+          }
+
+          // Render recent bookings table
+          const tbody = document.getElementById('recentRidesBody');
+          const rides = res.recentRides || [];
+          if (rides.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2.5rem; color: #94A3B8;">
+                  No ride bookings yet. Ready to go somewhere? <br /><br />
+                  <a href="/passenger/book-ride.html" class="btn btn-primary btn-sm">Book Your First Ride</a>
+                </td>
+              </tr>
+            `;
+            return;
+          }
+
+          tbody.innerHTML = rides.map(r => `
+            <tr>
+              <td><strong>#${r.request_id}</strong></td>
+              <td>${r.pickup_location}</td>
+              <td>${r.destination}</td>
+              <td><span style="text-transform: capitalize;">${r.vehicle_type}</span></td>
+              <td><strong>₹${parseFloat(r.estimated_fare).toFixed(2)}</strong></td>
+              <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+              <td>
+                <a href="/passenger/active-trip.html?id=${r.request_id}" class="btn btn-outline btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.8rem;">
+                  View
+                </a>
+              </td>
+            </tr>
+          `).join('');
+
+        } catch (err) {
+          console.error(err);
+          API.toast('Network error while loading dashboard', 'error');
+        }
+      }
+
+      document.getElementById('refreshBtn').addEventListener('click', () => {
+        API.toast('Refreshing dashboard...', 'info');
+        loadDashboard();
+      });
+
+      // Initial load
+      loadDashboard();
+    });
+  </script>
+</body>
+</html>
