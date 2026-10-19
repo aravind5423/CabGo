@@ -1,1 +1,355 @@
-<!-- TODO: search ride -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search Rides — CabGo</title>
+  <meta name="description" content="Search for available cab rides on CabGo. Compare vehicle types and fare estimates." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <style>
+    body { min-height: 100vh; }
+
+    /* ── Search Hero ── */
+    .search-hero {
+      background: linear-gradient(145deg, var(--bg-secondary) 0%, var(--bg) 100%);
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .search-hero::before {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, var(--primary-glow) 0%, transparent 65%);
+      top: -150px; right: -100px;
+      border-radius: 50%;
+    }
+    .search-hero-content { position: relative; z-index: 1; max-width: 700px; margin: 0 auto; text-align: center; }
+    .search-hero-content h1 { font-size: 2.25rem; margin-bottom: 0.5rem; }
+    .search-hero-content p  { color: var(--text-muted); margin-bottom: 2.5rem; }
+
+    /* ── Search Form Card ── */
+    .search-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+    }
+    .search-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 1rem;
+      align-items: flex-end;
+    }
+    .search-location-input { position: relative; }
+    .search-location-dot {
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .search-location-input .form-control { padding-left: 2.2rem; }
+    .dot-pickup { background: var(--success); }
+    .dot-drop   { background: var(--error); }
+
+    /* ── Results ── */
+    .search-results { padding: 3rem 0; }
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .results-meta { font-size: 0.9rem; color: var(--text-muted); }
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; }
+
+    /* ── Ride Option Card ── */
+    .ride-option {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .ride-option:hover, .ride-option.selected {
+      border-color: var(--primary);
+      background: var(--surface-2);
+      box-shadow: 0 0 0 4px var(--primary-glow);
+    }
+    .ride-option.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 1rem; right: 1rem;
+      width: 24px; height: 24px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700;
+    }
+    .ride-type-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .ride-type-icon {
+      width: 48px; height: 48px;
+      border-radius: var(--radius);
+      background: var(--bg-secondary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+    }
+    .ride-type-name { font-weight: 700; font-size: 1rem; text-transform: capitalize; }
+    .ride-type-capacity { font-size: 0.8rem; color: var(--text-muted); }
+    .ride-fare { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+    .ride-fare-label { font-size: 0.8rem; color: var(--text-subtle); margin-top: 0.15rem; }
+    .ride-rate-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .ride-rate-item { font-size: 0.8rem; color: var(--text-muted); }
+    .ride-rate-item strong { color: var(--text); display: block; font-size: 0.85rem; }
+
+    /* ── Book CTA ── */
+    .book-cta {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 1.75rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+    .book-cta-info { display: flex; flex-direction: column; gap: 0.25rem; }
+    .book-cta-info h3 { font-size: 1.15rem; }
+    .book-cta-info p  { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* ── Empty / Loading States ── */
+    .state-box {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+    .state-box .state-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+    .state-box h3 { color: var(--text); margin-bottom: 0.5rem; }
+
+    @media (max-width: 700px) {
+      .search-inputs { grid-template-columns: 1fr; }
+      .book-cta { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="navbar-logo">🚖 Cab<span>Go</span></a>
+    <div class="navbar-links">
+      <a href="/login.html"    class="btn btn-outline btn-sm">Log In</a>
+      <a href="/register.html" class="btn btn-accent btn-sm">Sign Up</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Search Hero -->
+<section class="search-hero">
+  <div class="container">
+    <div class="search-hero-content">
+      <h1>🔍 Find Your Ride</h1>
+      <p>Enter your pickup and destination to see available cabs and live fare estimates</p>
+
+      <div class="search-card">
+        <div class="search-inputs">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">📍 Pickup Location</label>
+            <div class="search-location-input">
+              <div class="search-location-dot dot-pickup"></div>
+              <input type="text" id="pickup" class="form-control" placeholder="Where are you?" />
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">🎯 Destination</label>
+            <div class="search-location-input">
+              <div class="search-location-dot dot-drop"></div>
+              <input type="text" id="destination" class="form-control" placeholder="Where to?" />
+            </div>
+          </div>
+          <button id="search-btn" class="btn btn-primary btn-lg">Search</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Results Section -->
+<section class="search-results">
+  <div class="container">
+
+    <!-- Initial state -->
+    <div id="state-initial" class="state-box">
+      <span class="state-icon">🚖</span>
+      <h3>Enter your locations above</h3>
+      <p>We'll show you available vehicle types and fare estimates</p>
+    </div>
+
+    <!-- Loading state -->
+    <div id="state-loading" class="state-box" style="display:none;">
+      <span class="spinner" style="width:48px;height:48px;margin-bottom:1rem;border-width:4px;"></span>
+      <h3>Finding available rides…</h3>
+    </div>
+
+    <!-- Error state -->
+    <div id="state-error" class="state-box" style="display:none;">
+      <span class="state-icon">❌</span>
+      <h3 id="error-title">Search failed</h3>
+      <p id="error-msg">Please try again.</p>
+    </div>
+
+    <!-- Results -->
+    <div id="state-results" style="display:none;">
+      <div class="results-header">
+        <div>
+          <h2 style="margin-bottom:0.25rem;">Available Rides</h2>
+          <div class="results-meta" id="results-meta"></div>
+        </div>
+        <div id="drivers-badge" class="badge badge-success"></div>
+      </div>
+
+      <div class="results-grid" id="results-grid"></div>
+
+      <!-- Book CTA -->
+      <div class="book-cta" id="book-cta" style="display:none;">
+        <div class="book-cta-info">
+          <h3 id="cta-title">Ready to book?</h3>
+          <p id="cta-subtitle">Log in or create an account to confirm your booking.</p>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <a href="/login.html" class="btn btn-outline">Log In to Book</a>
+          <a href="/register.html" class="btn btn-accent">Sign Up Free</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script>
+  const VEHICLE_ICONS = {
+    sedan:     '🚗',
+    suv:       '🚙',
+    hatchback: '🚘',
+    auto:      '🛺',
+    bike:      '🏍️',
+  };
+
+  let selectedType = null;
+
+  function showState(name) {
+    ['initial','loading','error','results'].forEach(s => {
+      document.getElementById(`state-${s}`).style.display = s === name ? 'block' : 'none';
+    });
+  }
+
+  function renderResults(data) {
+    const { pickup, destination, availableDrivers, fareOptions } = data;
+
+    document.getElementById('results-meta').textContent =
+      `${pickup} → ${destination}`;
+    document.getElementById('drivers-badge').textContent =
+      `${availableDrivers} driver${availableDrivers !== 1 ? 's' : ''} online`;
+
+    const grid = document.getElementById('results-grid');
+    grid.innerHTML = '';
+
+    if (!fareOptions || fareOptions.length === 0) {
+      showState('error');
+      document.getElementById('error-title').textContent = 'No fare options available';
+      document.getElementById('error-msg').textContent = 'Service area may not be configured yet.';
+      return;
+    }
+
+    fareOptions.forEach(opt => {
+      const card = document.createElement('div');
+      card.className = 'ride-option';
+      card.dataset.type = opt.vehicle_type;
+      card.innerHTML = `
+        <div class="ride-type-header">
+          <div class="ride-type-icon">${VEHICLE_ICONS[opt.vehicle_type] || '🚗'}</div>
+          <div>
+            <div class="ride-type-name">${opt.vehicle_type}</div>
+            <div class="ride-type-capacity">Up to 4 passengers</div>
+          </div>
+        </div>
+        <div class="ride-fare">₹ ${opt.estimated_fare}</div>
+        <div class="ride-fare-label">Estimated fare (approx. 5 km)</div>
+        <div class="ride-rate-row">
+          <div class="ride-rate-item"><strong>₹${opt.base_fare}</strong>Base Fare</div>
+          <div class="ride-rate-item"><strong>₹${opt.per_km_rate}/km</strong>Per KM</div>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.ride-option').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedType = opt.vehicle_type;
+
+        const ctaTitle    = document.getElementById('cta-title');
+        const ctaSubtitle = document.getElementById('cta-subtitle');
+        ctaTitle.textContent    = `${VEHICLE_ICONS[opt.vehicle_type]} ${opt.vehicle_type.toUpperCase()} — ₹${opt.estimated_fare} est.`;
+        ctaSubtitle.textContent = `Log in or sign up to book your ${opt.vehicle_type} from ${pickup} to ${destination}.`;
+        document.getElementById('book-cta').style.display = 'flex';
+      });
+      grid.appendChild(card);
+    });
+
+    showState('results');
+  }
+
+  document.getElementById('search-btn').addEventListener('click', async () => {
+    const pickup      = document.getElementById('pickup').value.trim();
+    const destination = document.getElementById('destination').value.trim();
+
+    if (!pickup || !destination) {
+      showToast('Please enter both pickup and destination.', 'warning');
+      return;
+    }
+
+    showState('loading');
+    document.getElementById('book-cta').style.display = 'none';
+    selectedType = null;
+
+    try {
+      const res = await API.get(`/api/rides/search?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}`);
+      if (res && res.success) {
+        renderResults(res);
+      } else {
+        showState('error');
+        document.getElementById('error-title').textContent = 'Search Failed';
+        document.getElementById('error-msg').textContent = res?.message || 'Please try again.';
+      }
+    } catch (err) {
+      showState('error');
+      document.getElementById('error-title').textContent = 'Network Error';
+      document.getElementById('error-msg').textContent = err.message;
+    }
+  });
+
+  // Allow pressing Enter to search
+  ['pickup','destination'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('search-btn').click();
+    });
+  });
+</script>
+</body>
+</html>

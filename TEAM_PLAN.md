@@ -116,25 +116,25 @@ cab-booking/                          ← project root
 **Goal**: Repo initialized, DB schema finalized, raw server running on localhost:3000
 
 #### Commit 1 — `chore: project scaffold & package.json`
-- [ ] Create full folder structure (empty files/folders)
-- [ ] Initialize `package.json` (only allowed dependency: `mysql2`)
-- [ ] Create `.gitignore` (node_modules, .env)
-- [ ] Create `.env.example` with DB config template
-- [ ] Write basic `README.md`
+- [x] Create full folder structure (empty files/folders)
+- [x] Initialize `package.json` (only allowed dependency: `mysql2`)
+- [x] Create `.gitignore` (node_modules, .env)
+- [x] Create `.env.example` with DB config template
+- [x] Write basic `README.md`
 
 #### Commit 2 — `feat(db): complete MySQL schema – all 12 tables`
-- [ ] `database/schema.sql` — all 12 tables with PK/FK/INDEX/ENUM:
+- [x] `database/schema.sql` — all 12 tables with PK/FK/INDEX/ENUM:
   - `users`, `passenger_profiles`, `driver_profiles`
   - `vehicles`, `service_areas`, `fare_rules`
   - `ride_requests`, `trips`, `payments`
   - `ratings_reviews`, `admin_permissions`, `system_logs`
 
 #### Commit 3 — `feat(server): raw Node.js HTTP server + DB pool + router + logger`
-- [ ] `server/db.js` — MySQL2 pool with `.env` config
-- [ ] `server/server.js` — `http.createServer`, static file serving from `/public`
-- [ ] `server/router.js` — URL pattern matching dispatcher
-- [ ] `server/middleware/logger.js` — logs every API call to `system_logs`
-- [ ] **Test**: `node server/server.js` → `localhost:3000` serves index.html
+- [x] `server/db.js` — MySQL2 pool with `.env` config
+- [x] `server/server.js` — `http.createServer`, static file serving from `/public`
+- [x] `server/router.js` — URL pattern matching dispatcher
+- [x] `server/middleware/logger.js` — logs every API call to `system_logs`
+- [x] **Test**: `node server/server.js` → `localhost:3000` serves index.html
 
 ---
 
@@ -142,24 +142,24 @@ cab-booking/                          ← project root
 **Goal**: Registration, login, HMAC-signed session token, public HTML pages live
 
 #### Commit 1 — `feat(auth): register & login REST APIs`
-- [ ] `POST /api/auth/register` — insert `users` + role profile
-- [ ] `POST /api/auth/login` — validate, return HMAC-signed token
-- [ ] `POST /api/auth/logout`
-- [ ] `GET /api/auth/me` — decode token, return user info
-- [ ] `server/middleware/auth.js` — token decode + role check
+- [x] `POST /api/auth/register` — insert `users` + role profile
+- [x] `POST /api/auth/login` — validate, return HMAC-signed token
+- [x] `POST /api/auth/logout`
+- [x] `GET /api/auth/me` — decode token, return user info
+- [x] `server/middleware/auth.js` — token decode + role check
 
 #### Commit 2 — `feat(ui): index.html, login.html, register.html`
-- [ ] `public/index.html` — Landing: hero, features, CTAs
-- [ ] `public/login.html` — Login form with Fetch submission
-- [ ] `public/register.html` — Tabbed: Passenger / Driver tabs
-- [ ] `public/css/global.css` — color palette, typography (Inter, Outfit), CSS variables
-- [ ] `public/css/auth.css` — glassmorphism cards, gradients
-- [ ] `public/js/api.js` — reusable fetch wrapper
-- [ ] `public/js/auth.js` — form logic, DOM error display, redirect on success
+- [x] `public/index.html` — Landing: hero, features, CTAs
+- [x] `public/login.html` — Login form with Fetch submission
+- [x] `public/register.html` — Tabbed: Passenger / Driver tabs
+- [x] `public/css/global.css` — color palette, typography (Inter, Outfit), CSS variables
+- [x] `public/css/auth.css` — glassmorphism cards, gradients
+- [x] `public/js/api.js` — reusable fetch wrapper
+- [x] `public/js/auth.js` — form logic, DOM error display, redirect on success
 
 #### Commit 3 — `feat(ui): search-ride.html + role-based route guard`
-- [ ] `public/search-ride.html` — pickup/destination inputs, vehicle filter
-- [ ] `public/js/router-guard.js` — read token from `sessionStorage`, decode role, redirect if unauthorized
+- [x] `public/search-ride.html` — pickup/destination inputs, vehicle filter
+- [x] `public/js/router-guard.js` — read token from `sessionStorage`, decode role, redirect if unauthorized
 
 ---
 
