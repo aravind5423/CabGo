@@ -54,7 +54,7 @@ const MIME = {
 };
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const PORT       = process.env.SERVER_PORT || 3000;
+const PORT       = process.env.SERVER_PORT || 5000;
 
 // ── Helper: send JSON ────────────────────────────────────────
 function sendJSON(res, status, data) {

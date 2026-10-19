@@ -217,47 +217,4 @@ module.exports = function authRoute(router) {
     }
   });
 
-  // ── GET /api/rides/search ────────────────────────────────
-  // Stub implementation for Day 2 UI — full logic on Day 3
-  router.get('/api/rides/search', async (req, res) => {
-    const { pickup, destination, type } = req.query;
-
-    if (!pickup || !destination) {
-      return req.sendJSON(400, { success: false, message: 'Pickup and destination are required.' });
-    }
-
-    try {
-      // Fetch fare options
-      let fareQuery = `SELECT * FROM fare_rules WHERE status = 'active'`;
-      const fareParams = [];
-      if (type) { fareQuery += ' AND vehicle_type = ?'; fareParams.push(type); }
-
-      const [fareRules] = await pool.execute(fareQuery, fareParams);
-
-      // Count online approved drivers
-      const [driverCount] = await pool.execute(
-        `SELECT COUNT(*) AS count FROM driver_profiles
-         WHERE availability = 'online' AND verification_status = 'approved'`
-      );
-
-      // Simulate ~5 km estimate
-      const fareOptions = fareRules.map(r => ({
-        vehicle_type:    r.vehicle_type,
-        base_fare:       parseFloat(r.base_fare),
-        per_km_rate:     parseFloat(r.per_km_rate),
-        estimated_fare:  +(parseFloat(r.base_fare) + 5 * parseFloat(r.per_km_rate)).toFixed(2),
-      }));
-
-      req.sendJSON(200, {
-        success:          true,
-        pickup,
-        destination,
-        availableDrivers: driverCount[0].count,
-        fareOptions,
-      });
-    } catch (err) {
-      console.error('[rides/search]', err.message);
-      req.sendJSON(500, { success: false, message: 'Search failed.' });
-    }
-  });
 };

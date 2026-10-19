@@ -11,126 +11,124 @@
 <body>
 
 <div class="auth-page">
+  <div class="auth-container">
 
-  <!-- Left: Brand Panel -->
-  <div class="auth-brand">
-    <a href="/" class="auth-brand-logo">🚖 Cab<span>Go</span></a>
-    <h2 class="auth-brand-title">Join the<br/><span class="text-gradient">CabGo Family</span></h2>
-    <p class="auth-brand-subtitle">Create your account in minutes. Free to join for passengers and drivers.</p>
-    <div class="auth-brand-features">
-      <div class="auth-feature">
-        <div class="auth-feature-icon">🧑‍💼</div>
-        <span>Passengers — book rides instantly</span>
+    <!-- Left: Brand Highlight Card -->
+    <div class="auth-brand">
+      <div>
+        <a href="/" class="auth-brand-logo">
+          <div class="auth-brand-badge">🚖</div>
+          <span>CabGo</span>
+        </a>
+
+        <div class="pill-tag dark" style="margin-bottom: 1rem;">Join CabGo</div>
+        <h1 class="auth-brand-title">Get Started<br />Today!</h1>
+        <p class="auth-brand-subtitle">Create your account in under 60 seconds. Free to join for both passengers and drivers.</p>
       </div>
-      <div class="auth-feature">
-        <div class="auth-feature-icon">🚗</div>
-        <span>Drivers — earn on your schedule</span>
-      </div>
-      <div class="auth-feature">
-        <div class="auth-feature-icon">🔒</div>
-        <span>Secure, verified accounts only</span>
-      </div>
-    </div>
-    <div class="auth-illustration">
-      <div class="taxi-card">
-        <span class="taxi-emoji">🎉</span>
-        <div style="font-family:var(--font-heading);font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:0.25rem;">
-          Ready to ride?
-        </div>
-        <div style="font-size:0.85rem;color:var(--text-muted);">
-          Join 10,000+ satisfied riders and 500+ verified drivers on CabGo.
-        </div>
-        <div class="taxi-fare" style="margin-top:0.75rem;font-size:1rem;">
-          ✅ Free to register
+
+      <div class="auth-illustration">
+        <div class="taxi-card">
+          <span class="taxi-emoji">🎉</span>
+          <div style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">
+            Ready to ride?
+          </div>
+          <div style="font-size: 0.85rem; color: #6B7280; line-height: 1.5;">
+            Join over 10,000 satisfied riders and 500+ verified drivers across the city.
+          </div>
+          <div class="taxi-fare" style="margin-top: 1rem; font-size: 0.95rem;">
+            <span>Free Registration</span>
+            <span style="color: #10B981;">✓ 100% Free</span>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Right: Form Panel (Porcelain Card) -->
+    <div class="auth-form-panel">
+      <div class="auth-form-box">
+        <div class="auth-form-header">
+          <div class="pill-tag">New Registration</div>
+          <h2>Create Account</h2>
+          <p>Choose your role to get started</p>
+        </div>
+
+        <!-- Role Tabs -->
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" data-role="passenger" role="tab" aria-selected="true">
+            🧑‍💼 Passenger
+          </button>
+          <button class="auth-tab" data-role="driver" role="tab" aria-selected="false">
+            🚗 Driver
+          </button>
+        </div>
+
+        <div id="form-alert" class="alert" role="alert"></div>
+
+        <form id="register-form" novalidate>
+
+          <!-- Common Fields -->
+          <div class="form-group">
+            <label for="reg-name">Full Name *</label>
+            <input type="text" id="reg-name" class="form-control" placeholder="Aravind Kumar" autocomplete="name" required />
+          </div>
+
+          <div class="form-group">
+            <label for="reg-email">Email Address *</label>
+            <input type="email" id="reg-email" class="form-control" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+
+          <div class="form-group">
+            <label for="reg-mobile">Mobile Number *</label>
+            <input type="tel" id="reg-mobile" class="form-control" placeholder="9876543210" maxlength="10" autocomplete="tel" required />
+          </div>
+
+          <div class="form-group">
+            <label for="reg-password">Password * <small>(min 6 characters)</small></label>
+            <div class="input-wrapper">
+              <input type="password" id="reg-password" class="form-control" placeholder="Create a strong password" autocomplete="new-password" required />
+              <button type="button" id="toggle-reg-password" class="toggle-password" aria-label="Toggle password">👁️</button>
+            </div>
+          </div>
+
+          <!-- Passenger-only Fields -->
+          <div id="passenger-fields">
+            <div class="form-group">
+              <label for="emergency-contact">Emergency Contact <small>(optional)</small></label>
+              <input type="tel" id="emergency-contact" class="form-control" placeholder="9876543210" maxlength="10" />
+            </div>
+            <div class="form-group">
+              <label for="default-address">Default Pickup Address <small>(optional)</small></label>
+              <input type="text" id="default-address" class="form-control" placeholder="e.g. 12 MG Road, Bangalore" />
+            </div>
+          </div>
+
+          <!-- Driver-only Fields -->
+          <div id="driver-fields" style="display:none;">
+            <div class="form-group">
+              <label for="license-no">Driving License Number *</label>
+              <input type="text" id="license-no" class="form-control" placeholder="KA-0120110012345" />
+            </div>
+            <div class="form-group">
+              <label for="license-expiry">License Expiry Date *</label>
+              <input type="date" id="license-expiry" class="form-control" />
+            </div>
+            <div style="background: #FEF3C7; color: #92400E; padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid #FCD34D;">
+              ⚠️ Driver accounts require admin approval before you can accept ride requests.
+            </div>
+          </div>
+
+          <button type="submit" id="register-btn" class="btn btn-lime btn-block btn-lg" style="margin-top: 1rem;">
+            Create Account ↗
+          </button>
+        </form>
+
+        <p class="auth-switch">
+          Already have an account? <a href="/login.html">Sign in</a>
+        </p>
+      </div>
+    </div>
+
   </div>
-
-  <!-- Right: Form Panel -->
-  <div class="auth-form-panel">
-    <div class="auth-form-box">
-      <div class="auth-form-header">
-        <h2>Create Account</h2>
-        <p>Choose your role to get started</p>
-      </div>
-
-      <!-- Role Tabs -->
-      <div class="auth-tabs" role="tablist">
-        <button class="auth-tab active" data-role="passenger" role="tab" aria-selected="true">
-          🧑‍💼 Passenger
-        </button>
-        <button class="auth-tab" data-role="driver" role="tab" aria-selected="false">
-          🚗 Driver
-        </button>
-      </div>
-
-      <div id="form-alert" class="alert" role="alert"></div>
-
-      <form id="register-form" novalidate>
-
-        <!-- Common Fields -->
-        <div class="form-group">
-          <label class="form-label" for="reg-name">Full Name *</label>
-          <input type="text" id="reg-name" class="form-control" placeholder="Aravind Kumar" autocomplete="name" required />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="reg-email">Email Address *</label>
-          <input type="email" id="reg-email" class="form-control" placeholder="you@example.com" autocomplete="email" required />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="reg-mobile">Mobile Number *</label>
-          <input type="tel" id="reg-mobile" class="form-control" placeholder="9876543210" maxlength="10" autocomplete="tel" required />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="reg-password">Password * <small>(min 6 characters)</small></label>
-          <div class="input-wrapper">
-            <input type="password" id="reg-password" class="form-control" placeholder="Create a strong password" autocomplete="new-password" required />
-            <button type="button" id="toggle-reg-password" class="toggle-password" aria-label="Toggle password">👁️</button>
-          </div>
-        </div>
-
-        <!-- Passenger-only Fields -->
-        <div id="passenger-fields">
-          <div class="form-group">
-            <label class="form-label" for="emergency-contact">Emergency Contact <small>(optional)</small></label>
-            <input type="tel" id="emergency-contact" class="form-control" placeholder="9876543210" maxlength="10" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="default-address">Default Pickup Address <small>(optional)</small></label>
-            <input type="text" id="default-address" class="form-control" placeholder="e.g. 12 MG Road, Bangalore" />
-          </div>
-        </div>
-
-        <!-- Driver-only Fields -->
-        <div id="driver-fields" style="display:none;">
-          <div class="form-group">
-            <label class="form-label" for="license-no">Driving License Number *</label>
-            <input type="text" id="license-no" class="form-control" placeholder="KA-0120110012345" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="license-expiry">License Expiry Date *</label>
-            <input type="date" id="license-expiry" class="form-control" />
-          </div>
-          <div class="alert alert-warning" style="display:flex; margin-bottom:1rem; font-size:0.85rem;">
-            ⚠️ Driver accounts require admin approval before you can accept rides.
-          </div>
-        </div>
-
-        <button type="submit" id="register-btn" class="btn btn-primary btn-full btn-lg" style="margin-top:0.5rem;">
-          Create Account
-        </button>
-      </form>
-
-      <p class="auth-switch">
-        Already have an account? <a href="/login.html">Sign in</a>
-      </p>
-    </div>
-  </div>
-
 </div>
 
 <div id="toast-container"></div>
