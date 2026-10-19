@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚖 CabGo — Online Cab Booking</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: hsl(220,15%,10%);
+      color: hsl(220,15%,92%);
+      font-family: 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 3rem;
+      max-width: 480px;
+    }
+    h1 { font-size: 2.5rem; color: hsl(38,95%,55%); margin-bottom: 0.5rem; }
+    p  { color: hsl(220,10%,60%); margin-bottom: 2rem; }
+    .badge {
+      display: inline-block;
+      background: hsl(142,70%,45%);
+      color: #000;
+      font-weight: 700;
+      padding: 0.3rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+    .links a {
+      display: block;
+      margin: 0.5rem 0;
+      color: hsl(220,80%,70%);
+      text-decoration: none;
+    }
+    .links a:hover { text-decoration: underline; }
+    #api-status { margin-top: 1.5rem; font-size: 0.9rem; color: hsl(220,10%,60%); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✅ Day 1 — Server Running</div>
+    <h1>🚖 CabGo</h1>
+    <p>Online Cab Booking System — Web Technology CIA Assignment</p>
+
+    <div class="links">
+      <a href="/login.html">→ Login</a>
+      <a href="/register.html">→ Register</a>
+      <a href="/search-ride.html">→ Search Rides</a>
+    </div>
+
+    <div id="api-status">Checking API…</div>
+  </div>
+
+  <script>
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('api-status').textContent = '✅ ' + d.message;
+        document.getElementById('api-status').style.color = 'hsl(142,70%,55%)';
+      })
+      .catch(() => {
+        document.getElementById('api-status').textContent = '❌ API not reachable';
+        document.getElementById('api-status').style.color = 'hsl(0,75%,55%)';
+      });
+  </script>
+</body>
+</html>
