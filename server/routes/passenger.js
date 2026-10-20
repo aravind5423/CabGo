@@ -6,6 +6,7 @@
 const pool = require('../db');
 const { requireRole } = require('../middleware/auth');
 const { logAction, getClientIp } = require('../middleware/logger');
+const { getRoadDistanceKm, calculateFare } = require('../utils/fareCalculator');
 
 // Helper to get or ensure passenger_id from user_id
 async function getPassengerId(connOrPool, userId) {
@@ -27,81 +28,104 @@ module.exports = function passengerRoute(router) {
 
   // ── GET /api/rides/search ────────────────────────────────────
   // Calculate fare estimate and find available driver count
+  // GET /api/rides/search
   router.get('/api/rides/search', async (req, res) => {
-    const { pickup, destination, type } = req.query;
+      const { pickup, destination, type } = req.query;
 
-    if (!pickup || !destination) {
-      return req.sendJSON(400, { success: false, message: 'Pickup and destination are required.' });
-    }
-
-    try {
-      let fareQuery = `SELECT * FROM fare_rules WHERE status = 'active'`;
-      const fareParams = [];
-      if (type) {
-        fareQuery += ' AND vehicle_type = ?';
-        fareParams.push(type);
+      if (
+          typeof pickup !== 'string' ||
+          typeof destination !== 'string' ||
+          !pickup.trim() ||
+          !destination.trim()
+      ) {
+          return req.sendJSON(400, {
+              success: false,
+              message: 'Pickup and destination are required.'
+          });
       }
 
-      const [fareRules] = await pool.execute(fareQuery, fareParams);
+      if (pickup.length > 300 || destination.length > 300) {
+          return req.sendJSON(400, {
+              success: false,
+              message: 'Addresses must be 300 characters or fewer.'
+          });
+      }
 
-      // Count active online drivers
-      const [driverCount] = await pool.execute(
-        `SELECT COUNT(*) AS count FROM driver_profiles
-         WHERE availability = 'online' AND verification_status = 'approved'`
-      );
+      const validTypes = ['sedan', 'suv', 'hatchback', 'auto', 'bike'];
 
-      // Realistic pseudo-distance based on string hashing if coordinates aren't provided
-      const pseudoDist = Math.max(3.2, ((pickup.length + destination.length) % 18) + 2.5);
+      if (type && !validTypes.includes(type)) {
+          return req.sendJSON(400, {
+              success: false,
+              message: 'Invalid vehicle type.'
+          });
+      }
 
-      const fareOptions = fareRules.map(r => {
-        const base = parseFloat(r.base_fare);
-        const perKm = parseFloat(r.per_km_rate);
-        const est = +(base + pseudoDist * perKm).toFixed(2);
-        return {
-          vehicle_type:   r.vehicle_type,
-          base_fare:      base,
-          per_km_rate:    perKm,
-          estimated_km:   +pseudoDist.toFixed(1),
-          estimated_fare: est,
-        };
-      });
+      try {
+          // Get actual road distance from OpenRouteService.
+          const estimatedKm = await getRoadDistanceKm(
+              pickup.trim(),
+              destination.trim()
+          );
 
-      req.sendJSON(200, {
-        success:          true,
-        pickup,
-        destination,
-        estimated_km:     +pseudoDist.toFixed(1),
-        availableDrivers: driverCount[0].count,
-        fareOptions,
-      });
-    } catch (err) {
-      console.warn('[rides/search] DB fallback mode:', err.message);
-      // Realistic default fare matrix for demo when DB is not yet running
-      const pseudoDist = Math.max(3.2, ((pickup.length + destination.length) % 18) + 2.5);
-      const defaults = [
-        { vehicle_type: 'sedan',     base_fare: 100.0, per_km_rate: 18.0 },
-        { vehicle_type: 'suv',       base_fare: 150.0, per_km_rate: 25.0 },
-        { vehicle_type: 'hatchback', base_fare: 80.0,  per_km_rate: 14.0 },
-        { vehicle_type: 'auto',      base_fare: 40.0,  per_km_rate: 10.0 },
-        { vehicle_type: 'bike',      base_fare: 25.0,  per_km_rate: 7.0 },
-      ];
-      const fareOptions = defaults.map(r => ({
-        vehicle_type:   r.vehicle_type,
-        base_fare:      r.base_fare,
-        per_km_rate:    r.per_km_rate,
-        estimated_km:   +pseudoDist.toFixed(1),
-        estimated_fare: +(r.base_fare + pseudoDist * r.per_km_rate).toFixed(2),
-      }));
+          // Retrieve active fares from MySQL.
+          let query = `
+              SELECT vehicle_type, base_fare, per_km_rate
+              FROM fare_rules
+              WHERE status = 'active'
+          `;
+          const params = [];
 
-      req.sendJSON(200, {
-        success:          true,
-        pickup,
-        destination,
-        estimated_km:     +pseudoDist.toFixed(1),
-        availableDrivers: 8,
-        fareOptions,
-      });
-    }
+          if (type) {
+              query += ' AND vehicle_type = ?';
+              params.push(type);
+          }
+
+          const [fareRules] = await pool.execute(query, params);
+
+          if (fareRules.length === 0) {
+              return req.sendJSON(404, {
+                  success: false,
+                  message: 'No active fare rules found for this vehicle.'
+              });
+          }
+
+          // Calculate a fare for each matching vehicle.
+          const fareOptions = fareRules.map(rule => ({
+              vehicle_type: rule.vehicle_type,
+              base_fare: Number(rule.base_fare),
+              per_km_rate: Number(rule.per_km_rate),
+              estimated_km: estimatedKm,
+              estimated_fare: calculateFare(
+                  estimatedKm,
+                  rule.base_fare,
+                  rule.per_km_rate
+              )
+          }));
+
+          // Count online, approved drivers.
+          const [driverCount] = await pool.execute(`
+              SELECT COUNT(*) AS count
+              FROM driver_profiles
+              WHERE availability = 'online'
+                AND verification_status = 'approved'
+          `);
+
+          return req.sendJSON(200, {
+              success: true,
+              pickup: pickup.trim(),
+              destination: destination.trim(),
+              estimated_km: estimatedKm,
+              availableDrivers: Number(driverCount[0].count),
+              fareOptions
+          });
+      } catch (err) {
+          console.error('[rides/search]', err.message);
+
+          return req.sendJSON(502, {
+              success: false,
+              message: 'Unable to calculate the route. Please check the addresses and try again.'
+          });
+      }
   });
 
   // ── POST /api/rides/book ─────────────────────────────────────
@@ -152,18 +176,36 @@ module.exports = function passengerRoute(router) {
       }
 
       // Calculate estimate if not provided
-      let finalFare = estimated_fare ? parseFloat(estimated_fare) : null;
-      if (!finalFare) {
-        const [rule] = await conn.execute(
-          'SELECT base_fare, per_km_rate FROM fare_rules WHERE vehicle_type = ? LIMIT 1',
+      // Recalculate the fare on the server; never trust the frontend price.
+      const distanceKm = await getRoadDistanceKm(
+          pickup_location.trim(),
+          destination.trim()
+      );
+
+      // Retrieve the active fare rule for the selected vehicle.
+      const [rules] = await conn.execute(
+          `SELECT base_fare, per_km_rate
+          FROM fare_rules
+          WHERE vehicle_type = ? AND status = 'active'
+          LIMIT 1`,
           [vehicle_type]
-        );
-        if (rule.length > 0) {
-          finalFare = +(parseFloat(rule[0].base_fare) + 5 * parseFloat(rule[0].per_km_rate)).toFixed(2);
-        } else {
-          finalFare = 150.00;
-        }
+      );
+
+      if (rules.length === 0) {
+          await conn.rollback();
+
+          return req.sendJSON(400, {
+              success: false,
+              message: 'No active fare rule exists for this vehicle.'
+          });
       }
+
+      // Calculate the final estimated fare using database rates.
+      const finalFare = calculateFare(
+          distanceKm,
+          rules[0].base_fare,
+          rules[0].per_km_rate
+      );
 
       const [result] = await conn.execute(
         `INSERT INTO ride_requests

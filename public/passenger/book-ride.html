@@ -103,39 +103,39 @@
               <label>Select Vehicle Type <span style="color: #F87171;">*</span></label>
               <div class="vehicle-selector-grid" id="vehicleGrid">
                 
-                <div class="vehicle-select-card selected" data-type="sedan" data-base="100" data-rate="18">
+                <div class="vehicle-select-card selected" data-type="sedan">
                   <div class="vehicle-card-icon">🚗</div>
                   <div class="vehicle-card-name">Sedan</div>
                   <div style="font-size: 0.72rem; color: #94A3B8;">4 Seats • AC</div>
-                  <div class="vehicle-card-fare" id="fare-sedan">₹190.00</div>
+                  <div class="vehicle-card-fare" id="fare-sedan">Enter route</div>
                 </div>
 
-                <div class="vehicle-select-card" data-type="suv" data-base="150" data-rate="25">
+                <div class="vehicle-select-card" data-type="suv">
                   <div class="vehicle-card-icon">🚙</div>
                   <div class="vehicle-card-name">SUV</div>
                   <div style="font-size: 0.72rem; color: #94A3B8;">6 Seats • Luxury</div>
-                  <div class="vehicle-card-fare" id="fare-suv">₹275.00</div>
+                  <div class="vehicle-card-fare" id="fare-suv">Enter route</div>
                 </div>
 
-                <div class="vehicle-select-card" data-type="hatchback" data-base="80" data-rate="14">
+                <div class="vehicle-select-card" data-type="hatchback">
                   <div class="vehicle-card-icon">🚕</div>
                   <div class="vehicle-card-name">Hatchback</div>
                   <div style="font-size: 0.72rem; color: #94A3B8;">4 Seats • Budget</div>
-                  <div class="vehicle-card-fare" id="fare-hatchback">₹150.00</div>
+                  <div class="vehicle-card-fare" id="fare-hatchback">Enter route</div>
                 </div>
 
-                <div class="vehicle-select-card" data-type="auto" data-base="40" data-rate="10">
+                <div class="vehicle-select-card" data-type="auto">
                   <div class="vehicle-card-icon">🛺</div>
                   <div class="vehicle-card-name">Auto</div>
                   <div style="font-size: 0.72rem; color: #94A3B8;">3 Seats • Fast</div>
-                  <div class="vehicle-card-fare" id="fare-auto">₹90.00</div>
+                  <div class="vehicle-card-fare" id="fare-auto">Enter route</div>
                 </div>
 
-                <div class="vehicle-select-card" data-type="bike" data-base="25" data-rate="7">
+                <div class="vehicle-select-card" data-type="bike">
                   <div class="vehicle-card-icon">🏍️</div>
                   <div class="vehicle-card-name">Bike</div>
                   <div style="font-size: 0.72rem; color: #94A3B8;">1 Seat • Solo</div>
-                  <div class="vehicle-card-fare" id="fare-bike">₹60.00</div>
+                  <div class="vehicle-card-fare" id="fare-bike">Enter route</div>
                 </div>
 
               </div>
@@ -192,19 +192,19 @@
               </div>
               <div class="fare-row">
                 <span>Estimated Distance</span>
-                <strong id="summaryDistance" style="color: #fff;">~5.0 km</strong>
+                <strong id="summaryDistance" style="color: #fff;">—</strong>
               </div>
               <div class="fare-row">
                 <span>Base Fare</span>
-                <strong id="summaryBaseFare" style="color: #fff;">₹100.00</strong>
+                <strong id="summaryBaseFare" style="color: #fff;">—</strong>
               </div>
               <div class="fare-row">
                 <span>Distance Charges</span>
-                <strong id="summaryDistFare" style="color: #fff;">₹90.00</strong>
+                <strong id="summaryDistFare" style="color: #fff;">—</strong>
               </div>
               <div class="fare-row total">
                 <span>Total Estimated Fare</span>
-                <span class="fare-amount" id="summaryTotalFare">₹190.00</span>
+                <span class="fare-amount" id="summaryTotalFare">Enter route to estimate</span>
               </div>
             </div>
 
@@ -237,106 +237,210 @@
         window.location.href = '/login.html';
       });
 
-      // State
+      // State: route estimates are fetched once per route, then reused for vehicle changes.
       let selectedType = 'sedan';
-      let currentEstimateFare = 190.00;
-      let calculatedKm = 5.0;
+      let currentEstimateFare = null;
+      let calculatedKm = null;
+      let fareOptions = [];
+      let estimatedRouteKey = null;
+      let routeRequestId = 0;
+      let routeTimer = null;
 
       const pickupInput = document.getElementById('pickupInput');
       const destInput = document.getElementById('destinationInput');
       const vehicleCards = document.querySelectorAll('.vehicle-select-card');
       const confirmBookBtn = document.getElementById('confirmBookBtn');
 
-      // Check URL search params for prefill (e.g. from index or search page)
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('pickup')) pickupInput.value = urlParams.get('pickup');
-      if (urlParams.get('destination')) destInput.value = urlParams.get('destination');
-      if (urlParams.get('type')) selectVehicle(urlParams.get('type'));
+      const summaryDistance = document.getElementById('summaryDistance');
+      const summaryBaseFare = document.getElementById('summaryBaseFare');
+      const summaryDistFare = document.getElementById('summaryDistFare');
+      const summaryTotalFare = document.getElementById('summaryTotalFare');
 
-      // Quick location helper buttons
-      document.querySelectorAll('.quick-loc-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.dataset.target;
-          const val = btn.dataset.val;
-          if (target === 'pickup') pickupInput.value = val;
-          else destInput.value = val;
-          updateFareCalculation();
-        });
-      });
-
-      // Vehicle selection handler
-      vehicleCards.forEach(card => {
-        card.addEventListener('click', () => {
-          vehicleCards.forEach(c => c.classList.remove('selected'));
-          card.classList.add('selected');
-          selectedType = card.dataset.type;
-          updateFareCalculation();
-        });
-      });
-
-      function selectVehicle(type) {
-        const found = Array.from(vehicleCards).find(c => c.dataset.type === type.toLowerCase());
-        if (found) {
-          vehicleCards.forEach(c => c.classList.remove('selected'));
-          found.classList.add('selected');
-          selectedType = type.toLowerCase();
-        }
+      function getRouteKey() {
+        return JSON.stringify([
+          pickupInput.value.trim(),
+          destInput.value.trim()
+        ]);
       }
 
-      // Live fare estimation
-      async function updateFareCalculation() {
-        const p = pickupInput.value.trim();
-        const d = destInput.value.trim();
-
-        document.getElementById('summaryPickup').textContent = p || 'Select pickup location';
-        document.getElementById('summaryDest').textContent = d || 'Select destination';
-        document.getElementById('summaryVehicleType').textContent = selectedType;
-
-        if (!p || !d) {
-          return;
-        }
-
-        try {
-          const res = await API.get(`/api/rides/search?pickup=${encodeURIComponent(p)}&destination=${encodeURIComponent(d)}&type=${selectedType}`);
-          if (res.success && res.fareOptions && res.fareOptions.length > 0) {
-            const opt = res.fareOptions[0];
-            calculatedKm = opt.estimated_km || 5.0;
-            currentEstimateFare = opt.estimated_fare;
-
-            document.getElementById('summaryDistance').textContent = `~${calculatedKm} km`;
-            document.getElementById('summaryBaseFare').textContent = `₹${parseFloat(opt.base_fare).toFixed(2)}`;
-            const distCharge = +(calculatedKm * opt.per_km_rate).toFixed(2);
-            document.getElementById('summaryDistFare').textContent = `₹${distCharge.toFixed(2)}`;
-            document.getElementById('summaryTotalFare').textContent = `₹${currentEstimateFare.toFixed(2)}`;
-
-            if (res.availableDrivers !== undefined) {
-              document.getElementById('driverCountDisplay').textContent = `${res.availableDrivers} Online`;
-            }
-          }
-        } catch {
-          // Fallback to local rate calculation if offline
-          const selectedCard = document.querySelector(`.vehicle-select-card[data-type="${selectedType}"]`);
-          const base = parseFloat(selectedCard?.dataset.base || 100);
-          const rate = parseFloat(selectedCard?.dataset.rate || 18);
-          currentEstimateFare = +(base + 5 * rate).toFixed(2);
-          document.getElementById('summaryTotalFare').textContent = `₹${currentEstimateFare.toFixed(2)}`;
-        }
-      }
-
-      pickupInput.addEventListener('input', debounce(updateFareCalculation, 400));
-      destInput.addEventListener('input', debounce(updateFareCalculation, 400));
-
-      function debounce(fn, ms) {
-        let timer;
-        return function (...args) {
-          clearTimeout(timer);
-          timer = setTimeout(() => fn.apply(this, args), ms);
+      function getRouteValues() {
+        return {
+          pickup: pickupInput.value.trim(),
+          destination: destInput.value.trim()
         };
       }
 
-      // Initial fare check if inputs exist
-      if (pickupInput.value && destInput.value) {
-        updateFareCalculation();
+      function resetFareSummary(message = 'Enter route to estimate') {
+        currentEstimateFare = null;
+        calculatedKm = null;
+        summaryDistance.textContent = '—';
+        summaryBaseFare.textContent = '—';
+        summaryDistFare.textContent = '—';
+        summaryTotalFare.textContent = message;
+      }
+
+      function resetVehicleCardFares(message = 'Enter route') {
+        vehicleCards.forEach(card => {
+          const fareElement = document.getElementById(`fare-${card.dataset.type}`);
+          if (fareElement) fareElement.textContent = message;
+        });
+      }
+
+      function updateRouteLabels() {
+        const { pickup, destination } = getRouteValues();
+        document.getElementById('summaryPickup').textContent = pickup || 'Select pickup location';
+        document.getElementById('summaryDest').textContent = destination || 'Select destination';
+        document.getElementById('summaryVehicleType').textContent = selectedType;
+      }
+
+      // Display a fare from the already-fetched options. This does not call the API.
+      function renderSelectedFare() {
+        updateRouteLabels();
+
+        const currentKey = getRouteKey();
+        const option = estimatedRouteKey === currentKey
+          ? fareOptions.find(item => item.vehicle_type === selectedType)
+          : null;
+
+        if (!option) {
+          resetFareSummary(
+            pickupInput.value.trim() && destInput.value.trim()
+              ? 'Calculating…'
+              : 'Enter route to estimate'
+          );
+          return;
+        }
+
+        calculatedKm = Number(option.estimated_km);
+        currentEstimateFare = Number(option.estimated_fare);
+
+        summaryDistance.textContent = `~${calculatedKm} km`;
+        summaryBaseFare.textContent = `₹${Number(option.base_fare).toFixed(2)}`;
+        summaryDistFare.textContent =
+          `₹${(calculatedKm * Number(option.per_km_rate)).toFixed(2)}`;
+        summaryTotalFare.textContent = `₹${currentEstimateFare.toFixed(2)}`;
+      }
+
+      // Fetch the road distance and all active vehicle fares for this route in one request.
+      async function fetchFareOptions(routeKey, requestId) {
+        const { pickup, destination } = getRouteValues();
+
+        if (!pickup || !destination || routeKey !== getRouteKey()) return;
+
+        try {
+          const res = await API.get(
+            `/api/rides/search?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}`
+          );
+
+          // Ignore responses for a route that has changed while the request was running.
+          if (requestId !== routeRequestId || routeKey !== getRouteKey()) return;
+
+          if (!res.success || !Array.isArray(res.fareOptions) || res.fareOptions.length === 0) {
+            estimatedRouteKey = null;
+            fareOptions = [];
+            resetVehicleCardFares('Unavailable');
+            resetFareSummary('Unable to calculate');
+            return;
+          }
+
+          fareOptions = res.fareOptions;
+          estimatedRouteKey = routeKey;
+
+          // Update all vehicle cards from database-backed fare options.
+          resetVehicleCardFares('Unavailable');
+          fareOptions.forEach(option => {
+            const fareElement = document.getElementById(`fare-${option.vehicle_type}`);
+            if (fareElement) {
+              fareElement.textContent = `₹${Number(option.estimated_fare).toFixed(2)}`;
+            }
+          });
+
+          if (res.availableDrivers !== undefined) {
+            document.getElementById('driverCountDisplay').textContent =
+              `${res.availableDrivers} Online`;
+          }
+
+          renderSelectedFare();
+        } catch (err) {
+          if (requestId !== routeRequestId || routeKey !== getRouteKey()) return;
+
+          estimatedRouteKey = null;
+          fareOptions = [];
+          resetVehicleCardFares('Unavailable');
+          resetFareSummary('Unable to calculate');
+          console.error('Fare calculation failed:', err);
+        }
+      }
+
+      // Input changes invalidate the old estimate immediately and debounce the route request.
+      function handleRouteInput() {
+        clearTimeout(routeTimer);
+        routeRequestId++;
+        estimatedRouteKey = null;
+        fareOptions = [];
+
+        updateRouteLabels();
+        resetFareSummary(
+          pickupInput.value.trim() && destInput.value.trim()
+            ? 'Calculating…'
+            : 'Enter route to estimate'
+        );
+        resetVehicleCardFares(
+          pickupInput.value.trim() && destInput.value.trim()
+            ? 'Calculating…'
+            : 'Enter route'
+        );
+
+        const { pickup, destination } = getRouteValues();
+        if (!pickup || !destination) return;
+
+        const routeKey = getRouteKey();
+        const requestId = routeRequestId;
+        routeTimer = setTimeout(() => {
+          fetchFareOptions(routeKey, requestId);
+        }, 800);
+      }
+
+      // Prefill route fields from the URL, if provided.
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('pickup')) pickupInput.value = urlParams.get('pickup');
+      if (urlParams.get('destination')) destInput.value = urlParams.get('destination');
+
+      // Select a vehicle locally; no route/API request is needed for this change.
+      function selectVehicle(type) {
+        const normalizedType = String(type || '').toLowerCase();
+        const found = Array.from(vehicleCards).find(card => card.dataset.type === normalizedType);
+        if (!found) return;
+
+        vehicleCards.forEach(card => card.classList.remove('selected'));
+        found.classList.add('selected');
+        selectedType = normalizedType;
+        renderSelectedFare();
+      }
+
+      vehicleCards.forEach(card => {
+        card.addEventListener('click', () => selectVehicle(card.dataset.type));
+      });
+
+      if (urlParams.get('type')) selectVehicle(urlParams.get('type'));
+
+      pickupInput.addEventListener('input', handleRouteInput);
+      destInput.addEventListener('input', handleRouteInput);
+
+      // Quick location helper buttons update the route and use the same debounced flow.
+      document.querySelectorAll('.quick-loc-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.target;
+          const value = btn.dataset.val;
+          if (target === 'pickup') pickupInput.value = value;
+          else destInput.value = value;
+          handleRouteInput();
+        });
+      });
+
+      // If both fields were prefilled, calculate the route once on page load.
+      if (pickupInput.value.trim() && destInput.value.trim()) {
+        handleRouteInput();
       }
 
       // Handle Booking Submission
@@ -347,6 +451,17 @@
 
         if (!pickup || !destination) {
           API.toast('Please provide both pickup and destination locations.', 'error');
+          return;
+        }
+
+        if (
+          estimatedRouteKey !== getRouteKey() ||
+          !Number.isFinite(currentEstimateFare) ||
+          currentEstimateFare <= 0 ||
+          !Number.isFinite(calculatedKm) ||
+          calculatedKm <= 0
+        ) {
+          API.toast('Please wait for a valid fare estimate before booking.', 'error');
           return;
         }
 
