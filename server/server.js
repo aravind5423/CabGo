@@ -28,16 +28,16 @@ if (fs.existsSync(envPath)) {
 const Router         = require('./router');
 const authRoute      = require('./routes/auth');
 const passengerRoute = require('./routes/passenger');
-// Day 4+ routes:
-// const driverRoute    = require('./routes/driver');
+const driverRoute    = require('./routes/driver');
+// Day 7+ routes:
 // const adminRoute     = require('./routes/admin');
 // const superRoute     = require('./routes/superadmin');
 
 const router = new Router();
 authRoute(router);
 passengerRoute(router);
-// Day 4+:
-// driverRoute(router);
+driverRoute(router);
+// Day 7+:
 // adminRoute(router);
 // superRoute(router);
 

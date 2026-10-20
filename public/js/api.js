@@ -57,6 +57,9 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
+// Alias on API object for consistent usage across modules
+API.toast = showToast;
+
 // ── Loading button helper ────────────────────────────────
 function setButtonLoading(btn, loading, originalText = '') {
   if (loading) {
