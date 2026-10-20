@@ -76,12 +76,12 @@ INSERT INTO ride_requests (request_id, passenger_id, pickup_location, destinatio
 
 -- 8. TRIPS
 INSERT INTO trips (trip_id, request_id, passenger_id, driver_id, vehicle_id, start_time, end_time, distance_km, fare, trip_status) VALUES
-(1, 1, 1, 1, 1, DATE_SUB(NOW(), INTERVAL 3 HOUR), DATE_SUB(NOW(), INTERVAL 2 HOUR + INTERVAL 25 MINUTE), 8.50, 253.00, 'completed'),
+(1, 1, 1, 1, 1, DATE_SUB(NOW(), INTERVAL 3 HOUR), DATE_SUB(NOW(), INTERVAL 145 MINUTE), 8.50, 253.00, 'completed'),
 (2, 2, 2, 2, 2, DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 20 MINUTE), 15.20, 530.00, 'completed');
 
 -- 9. PAYMENTS
 INSERT INTO payments (payment_id, trip_id, passenger_id, amount, payment_method, payment_status, paid_at) VALUES
-(1, 1, 1, 253.00, 'wallet', 'completed', DATE_SUB(NOW(), INTERVAL 2 HOUR + INTERVAL 25 MINUTE)),
+(1, 1, 1, 253.00, 'wallet', 'completed', DATE_SUB(NOW(), INTERVAL 145 MINUTE)),
 (2, 2, 2, 530.00, 'card', 'completed', DATE_SUB(NOW(), INTERVAL 20 MINUTE));
 
 -- 10. RATINGS & REVIEWS
