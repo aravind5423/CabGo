@@ -186,20 +186,20 @@ cab-booking/                          ← project root
 **Goal**: Driver can go online, receive requests, accept/reject, start/end trips
 
 #### Commit 1 — `feat(api): driver availability + ride request APIs`
-- [ ] `PUT /api/driver/availability` — toggle online/offline
-- [ ] `GET /api/driver/ride-requests` — pending requests
-- [ ] `PUT /api/driver/ride-requests/:id/accept`
-- [ ] `PUT /api/driver/ride-requests/:id/reject`
-- [ ] `PUT /api/driver/trips/:id/start`
-- [ ] `PUT /api/driver/trips/:id/complete`
+- [x] `PUT /api/driver/availability` — toggle online/offline
+- [x] `GET /api/driver/ride-requests` — pending requests
+- [x] `PUT /api/driver/ride-requests/:id/accept`
+- [x] `PUT /api/driver/ride-requests/:id/reject`
+- [x] `PUT /api/driver/trips/:id/start`
+- [x] `PUT /api/driver/trips/:id/complete`
 
 #### Commit 2 — `feat(ui): driver-dashboard.html + ride-requests.html`
-- [ ] Dashboard: online/offline toggle, live stats, ride request notification (poll 10 sec)
-- [ ] Ride requests: list with accept/reject buttons, DOM status update (no reload)
+- [x] Dashboard: online/offline toggle, live stats, ride request notification (poll 10 sec)
+- [x] Ride requests: list with accept/reject buttons, DOM status update (no reload)
 
 #### Commit 3 — `feat(ui): driver active-trip.html + earnings.html`
-- [ ] Active trip: Start → Complete flow, status badge DOM update
-- [ ] Earnings: total + per-trip breakdown, date filter (week/month)
+- [x] Active trip: Start → Complete flow, status badge DOM update
+- [x] Earnings: total + per-trip breakdown, date filter (week/month)
 
 ---
 

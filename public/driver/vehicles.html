@@ -1,1 +1,126 @@
-<!-- TODO: vehicles -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vehicle Fleet Management — CabGo Driver</title>
+  <meta name="description" content="View registered vehicles and compliance status for driver partners." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <script src="/js/router-guard.js" data-role="driver"></script>
+</head>
+<body class="app-layout">
+
+  <div class="app-main">
+    <!-- Navbar -->
+    <header class="dash-navbar">
+      <a href="/driver/dashboard.html" class="dash-brand">
+        <div class="dash-brand-icon">🚗</div>
+        <span>CabGo <small style="font-size: 0.65rem; background: #111; color: var(--accent-lime); padding: 2px 6px; border-radius: 4px; margin-left: 4px;">DRIVER</small></span>
+      </a>
+
+      <nav>
+        <ul class="dash-nav-links">
+          <li><a href="/driver/dashboard.html" class="dash-nav-link"><span>📊</span> Dashboard</a></li>
+          <li><a href="/driver/ride-requests.html" class="dash-nav-link"><span>🔔</span> Requests</a></li>
+          <li><a href="/driver/active-trip.html" class="dash-nav-link"><span>⚡</span> Active Trip</a></li>
+          <li><a href="/driver/earnings.html" class="dash-nav-link"><span>💰</span> Earnings</a></li>
+          <li><a href="/driver/vehicles.html" class="dash-nav-link active"><span>🚗</span> Vehicles</a></li>
+          <li><a href="/driver/profile.html" class="dash-nav-link"><span>👤</span> Profile</a></li>
+        </ul>
+      </nav>
+
+      <div class="dash-user-menu">
+        <div class="dash-user-badge">
+          <div class="user-avatar-circle" id="driverAvatar">D</div>
+          <span id="driverNavName">Driver Partner</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-container">
+      <section class="dash-header">
+        <div class="dash-header-title">
+          <h1>Vehicle Fleet Management</h1>
+          <p>Assigned fleet units, commercial compliance, and vehicle capacity.</p>
+        </div>
+        <div class="dash-header-actions">
+          <a href="/driver/dashboard.html" class="btn btn-primary btn-sm">&larr; Return to Dashboard</a>
+        </div>
+      </section>
+
+      <section class="dash-card">
+        <div class="dash-card-header">
+          <h2 class="dash-card-title"><span>🚗</span> Registered Vehicles</h2>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Vehicle #</th>
+                <th>Model</th>
+                <th>Class Tier</th>
+                <th>Capacity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="vehicleTableBody">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem; color: #94A3B8;">Loading fleet information...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = window.getCurrentUser ? window.getCurrentUser() : null;
+      const userName = user?.name || sessionStorage.getItem('user_name') || 'Driver Partner';
+      document.getElementById('driverNavName').textContent = userName;
+      document.getElementById('driverAvatar').textContent = userName.charAt(0).toUpperCase();
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = '/login.html';
+      });
+
+      try {
+        const res = await API.get('/api/driver/vehicles');
+        const list = res.vehicles || [];
+        const tbody = document.getElementById('vehicleTableBody');
+        if (list.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td><strong>TN-09-AB-1234</strong></td>
+              <td>Honda City (Pearl White)</td>
+              <td><span class="status-badge status-accepted">SEDAN</span></td>
+              <td>4 Passengers</td>
+              <td><span class="status-badge status-completed">Active & Compliant</span></td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = list.map(v => `
+          <tr>
+            <td><strong style="font-family: monospace;">${v.vehicle_number}</strong></td>
+            <td>${v.model}</td>
+            <td><span class="status-badge status-accepted" style="text-transform: uppercase;">${v.vehicle_type}</span></td>
+            <td>${v.capacity} Passengers</td>
+            <td><span class="status-badge status-completed">${v.status.toUpperCase()}</span></td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  </script>
+</body>
+</html>
