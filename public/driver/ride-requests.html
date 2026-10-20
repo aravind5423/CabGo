@@ -1,1 +1,373 @@
-<!-- TODO: ride requests -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Incoming Ride Requests — CabGo Driver</title>
+  <meta name="description" content="View and accept live ride requests from passengers in your service area." />
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <script src="/js/router-guard.js" data-role="driver"></script>
+  <style>
+    .requests-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    .request-card {
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--radius-xl, 32px);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-card);
+      position: relative;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .request-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+      border-color: #111315;
+    }
+    .req-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .req-pill {
+      background: #F1F5F9;
+      color: #334155;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-pill);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .req-fare-badge {
+      font-family: var(--font-heading);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #111315;
+    }
+    .passenger-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.75rem 0 1.25rem;
+      padding: 0.75rem;
+      background: #F7F8F4;
+      border-radius: var(--radius-md, 18px);
+    }
+    .passenger-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent-lime);
+      color: #111315;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .route-visual {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .route-visual::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 10px;
+      bottom: 10px;
+      width: 2px;
+      border-left: 2px dashed #CBD5E1;
+    }
+    .point-dot {
+      position: absolute;
+      left: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+    }
+    .point-pickup { top: 0; border: 3px solid #10B981; }
+    .point-dest { bottom: 0; border: 3px solid #EF4444; }
+    .loc-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #94A3B8;
+    }
+    .loc-text {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #111315;
+    }
+    .radar-pulse-ring {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+      animation: pulseAnimation 1.6s infinite;
+      display: inline-block;
+    }
+    @keyframes pulseAnimation {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+  </style>
+</head>
+<body class="app-layout">
+
+  <div class="app-main">
+    <!-- Navbar -->
+    <header class="dash-navbar">
+      <a href="/driver/dashboard.html" class="dash-brand">
+        <div class="dash-brand-icon">🚗</div>
+        <span>CabGo <small style="font-size: 0.65rem; background: #111; color: var(--accent-lime); padding: 2px 6px; border-radius: 4px; margin-left: 4px;">DRIVER</small></span>
+      </a>
+
+      <nav>
+        <ul class="dash-nav-links">
+          <li><a href="/driver/dashboard.html" class="dash-nav-link"><span>📊</span> Dashboard</a></li>
+          <li><a href="/driver/ride-requests.html" class="dash-nav-link active"><span>🔔</span> Requests</a></li>
+          <li><a href="/driver/active-trip.html" class="dash-nav-link"><span>⚡</span> Active Trip</a></li>
+          <li><a href="/driver/earnings.html" class="dash-nav-link"><span>💰</span> Earnings</a></li>
+          <li><a href="/driver/vehicles.html" class="dash-nav-link"><span>🚗</span> Vehicles</a></li>
+          <li><a href="/driver/profile.html" class="dash-nav-link"><span>👤</span> Profile</a></li>
+        </ul>
+      </nav>
+
+      <div class="dash-user-menu">
+        <div class="dash-user-badge">
+          <div class="user-avatar-circle" id="driverAvatar">D</div>
+          <span id="driverNavName">Driver Partner</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm">Logout</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-container">
+      <section class="dash-header">
+        <div class="dash-header-title">
+          <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.25rem;">
+            <span class="radar-pulse-ring"></span>
+            <span style="font-size: 0.85rem; font-weight: 700; color: #059669; text-transform: uppercase;">Live Dispatch Radar</span>
+          </div>
+          <h1>Incoming Ride Requests</h1>
+          <p>Real-time booking requests matched with your vehicle tier. First to accept gets assigned!</p>
+        </div>
+
+        <div class="dash-header-actions">
+          <button id="manualRefreshBtn" class="btn btn-outline btn-sm">
+            <span>🔄 Refresh Feed</span>
+          </button>
+          <a href="/driver/dashboard.html" class="btn btn-primary btn-sm">
+            &larr; Back to Dashboard
+          </a>
+        </div>
+      </section>
+
+      <!-- Filter / Status Bar -->
+      <div style="background: #FFFFFF; border-radius: var(--radius-pill); border: 1px solid rgba(0, 0, 0, 0.06); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-card);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <span style="font-weight: 700; font-size: 0.9rem; color: #111315;">Duty Status:</span>
+          <span id="dutyIndicator" class="status-badge status-accepted" style="background: #D1FAE5; color: #059669;">ONLINE</span>
+          <span id="vehicleTypeBadge" class="req-pill" style="text-transform: uppercase;">Sedan Tier</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #64748B;">
+          Auto-polling every <strong style="color: #111;">6 seconds</strong> • <span id="requestCountLabel">0 requests found</span>
+        </div>
+      </div>
+
+      <!-- Requests Feed Grid -->
+      <div id="requestsContainer" class="requests-grid">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px dashed rgba(0,0,0,0.1);">
+          <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">📡</span>
+          <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">Scanning your dispatch radius...</h3>
+          <p style="color: #64748B; font-size: 0.92rem;">Incoming ride requests from nearby passengers will appear here automatically.</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = window.getCurrentUser ? window.getCurrentUser() : null;
+      const userName = user?.name || sessionStorage.getItem('user_name') || 'Driver Partner';
+      document.getElementById('driverNavName').textContent = userName;
+      document.getElementById('driverAvatar').textContent = userName.charAt(0).toUpperCase();
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        sessionStorage.clear();
+        API.toast('Logged out', 'info');
+        setTimeout(() => window.location.href = '/login.html', 400);
+      });
+
+      const container = document.getElementById('requestsContainer');
+      const countLabel = document.getElementById('requestCountLabel');
+      const dutyIndicator = document.getElementById('dutyIndicator');
+      const vehicleBadge = document.getElementById('vehicleTypeBadge');
+
+      async function fetchRequests() {
+        try {
+          const res = await API.get('/api/driver/ride-requests');
+          if (!res.success) {
+            API.toast(res.message || 'Error loading requests', 'error');
+            return;
+          }
+
+          if (res.availability === 'offline') {
+            dutyIndicator.textContent = 'OFFLINE';
+            dutyIndicator.style.background = '#FEE2E2';
+            dutyIndicator.style.color = '#DC2626';
+            container.innerHTML = `
+              <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px solid rgba(0,0,0,0.06);">
+                <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">🚫</span>
+                <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">You are currently OFFLINE</h3>
+                <p style="color: #64748B; font-size: 0.92rem; margin-bottom: 1.5rem;">Switch your status to Online from the dashboard to start receiving trip offers.</p>
+                <a href="/driver/dashboard.html" class="btn btn-primary btn-sm">Go to Dashboard &rarr;</a>
+              </div>
+            `;
+            countLabel.textContent = '0 requests (Offline)';
+            return;
+          }
+
+          dutyIndicator.textContent = 'ONLINE';
+          dutyIndicator.style.background = '#D1FAE5';
+          dutyIndicator.style.color = '#059669';
+
+          if (res.vehicleType) {
+            vehicleBadge.textContent = `${res.vehicleType.toUpperCase()} Tier`;
+          }
+
+          const reqs = res.requests || [];
+          countLabel.textContent = `${reqs.length} ${reqs.length === 1 ? 'request' : 'requests'} available`;
+
+          if (reqs.length === 0) {
+            container.innerHTML = `
+              <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px dashed rgba(0,0,0,0.1);">
+                <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">📡</span>
+                <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">Scanning your dispatch radius...</h3>
+                <p style="color: #64748B; font-size: 0.92rem;">No pending ride requests right now. As soon as a rider books, it will pop up here.</p>
+              </div>
+            `;
+            return;
+          }
+
+          container.innerHTML = reqs.map(r => `
+            <div class="request-card" id="card-${r.request_id}">
+              <div>
+                <div class="req-top-bar">
+                  <div class="req-pill">
+                    <span>🚖</span> #${r.request_id} • ${r.vehicle_type.toUpperCase()}
+                  </div>
+                  <div class="req-fare-badge">
+                    ₹${parseFloat(r.estimated_fare).toFixed(2)}
+                  </div>
+                </div>
+
+                <div class="passenger-row">
+                  <div class="passenger-avatar">${(r.passenger_name || 'P').charAt(0).toUpperCase()}</div>
+                  <div style="flex: 1;">
+                    <div style="font-weight: 800; font-size: 0.95rem; color: #111;">${r.passenger_name || 'Passenger'}</div>
+                    <div style="font-size: 0.8rem; color: #64748B;">📞 ${r.passenger_mobile || 'Contact verified'}</div>
+                  </div>
+                  <span class="status-badge status-pending">Pending</span>
+                </div>
+
+                <div class="route-visual">
+                  <span class="point-dot point-pickup"></span>
+                  <div>
+                    <div class="loc-label">Pickup Location</div>
+                    <div class="loc-text">${r.pickup_location}</div>
+                  </div>
+
+                  <span class="point-dot point-dest"></span>
+                  <div style="margin-top: 0.75rem;">
+                    <div class="loc-label">Drop Destination</div>
+                    <div class="loc-text">${r.destination}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 0.75rem; margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
+                <button class="btn btn-primary accept-request-btn" data-id="${r.request_id}" style="flex: 1;">
+                  ✓ Accept Ride
+                </button>
+                <button class="btn btn-outline decline-request-btn" data-id="${r.request_id}">
+                  ✕ Decline
+                </button>
+              </div>
+            </div>
+          `).join('');
+
+          // Bind Accept
+          document.querySelectorAll('.accept-request-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = btn.dataset.id;
+              btn.disabled = true;
+              btn.textContent = 'Accepting...';
+              try {
+                const aRes = await API.put(`/api/driver/ride-requests/${id}/accept`);
+                if (aRes.success) {
+                  API.toast('Ride Accepted! Launching active trip navigator...', 'success');
+                  setTimeout(() => {
+                    window.location.href = `/driver/active-trip.html?id=${aRes.trip_id}`;
+                  }, 600);
+                } else {
+                  API.toast(aRes.message || 'Cannot accept ride', 'error');
+                  fetchRequests();
+                }
+              } catch (err) {
+                API.toast('Network error accepting request', 'error');
+              }
+            });
+          });
+
+          // Bind Decline
+          document.querySelectorAll('.decline-request-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = btn.dataset.id;
+              document.getElementById(`card-${id}`)?.remove();
+              API.put(`/api/driver/ride-requests/${id}/reject`);
+              API.toast('Request declined', 'info');
+            });
+          });
+
+        } catch (err) {
+          console.warn('[requests] error:', err);
+        }
+      }
+
+      fetchRequests();
+      setInterval(fetchRequests, 6000);
+
+      document.getElementById('manualRefreshBtn').addEventListener('click', () => {
+        API.toast('Checking for new requests...', 'info');
+        fetchRequests();
+      });
+    });
+  </script>
+</body>
+</html>
