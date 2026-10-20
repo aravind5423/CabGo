@@ -763,7 +763,7 @@ module.exports = function driverRoute(router) {
     }
   });
 
-  // ── GET & POST /api/driver/vehicles ──────────────────────────
+  // ── GET, POST, PUT, DELETE /api/driver/vehicles ────────────
   router.get('/api/driver/vehicles', async (req, res) => {
     const guard = requireRole(['driver'])(req);
     if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
@@ -777,6 +777,156 @@ module.exports = function driverRoute(router) {
       req.sendJSON(200, { success: true, vehicles });
     } catch (err) {
       req.sendJSON(500, { success: false, message: 'Failed to load vehicles.' });
+    }
+  });
+
+  router.post('/api/driver/vehicles', async (req, res) => {
+    const guard = requireRole(['driver'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    const { vehicle_number, vehicle_type, model, capacity } = req.body || {};
+    if (!vehicle_number || !vehicle_type || !model) {
+      return req.sendJSON(400, { success: false, message: 'Vehicle registration number, type, and model are required.' });
+    }
+
+    const validTypes = ['sedan', 'suv', 'hatchback', 'auto', 'bike'];
+    const cleanType = String(vehicle_type).toLowerCase().trim();
+    if (!validTypes.includes(cleanType)) {
+      return req.sendJSON(400, { success: false, message: 'Invalid vehicle type. Allowed: ' + validTypes.join(', ') });
+    }
+
+    const cleanNumber = String(vehicle_number).toUpperCase().trim();
+    const cleanModel = String(model).trim();
+    const parsedCapacity = parseInt(capacity, 10) || (cleanType === 'bike' ? 1 : cleanType === 'auto' ? 3 : cleanType === 'suv' ? 6 : 4);
+
+    try {
+      const { driver } = await getDriverDetails(pool, guard.user.user_id);
+
+      // Check for duplicate vehicle number
+      const [existing] = await pool.execute(
+        'SELECT vehicle_id FROM vehicles WHERE vehicle_number = ? LIMIT 1',
+        [cleanNumber]
+      );
+      if (existing.length > 0) {
+        return req.sendJSON(409, { success: false, message: 'A vehicle with this registration number already exists.' });
+      }
+
+      const [insertRes] = await pool.execute(
+        `INSERT INTO vehicles (driver_id, vehicle_number, vehicle_type, model, capacity, status)
+         VALUES (?, ?, ?, ?, ?, 'active')`,
+        [driver.driver_id, cleanNumber, cleanType, cleanModel, parsedCapacity]
+      );
+
+      await logAction(pool, guard.user.user_id, 'ADD_VEHICLE', `Registered vehicle ${cleanNumber}`, getClientIp(req));
+
+      return req.sendJSON(201, {
+        success: true,
+        message: 'Vehicle registered successfully.',
+        vehicle: {
+          vehicle_id: insertRes.insertId,
+          driver_id: driver.driver_id,
+          vehicle_number: cleanNumber,
+          vehicle_type: cleanType,
+          model: cleanModel,
+          capacity: parsedCapacity,
+          status: 'active'
+        }
+      });
+    } catch (err) {
+      console.error('[driver/vehicles POST]', err);
+      return req.sendJSON(500, { success: false, message: 'Failed to add vehicle.' });
+    }
+  });
+
+  router.put('/api/driver/vehicles/:id', async (req, res) => {
+    const guard = requireRole(['driver'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    const vehicleId = parseInt(req.params.id, 10);
+    if (!vehicleId) return req.sendJSON(400, { success: false, message: 'Invalid vehicle ID.' });
+
+    const { model, capacity, vehicle_type, status } = req.body || {};
+
+    try {
+      const { driver } = await getDriverDetails(pool, guard.user.user_id);
+
+      const [existing] = await pool.execute(
+        'SELECT * FROM vehicles WHERE vehicle_id = ? AND driver_id = ? LIMIT 1',
+        [vehicleId, driver.driver_id]
+      );
+      if (existing.length === 0) {
+        return req.sendJSON(404, { success: false, message: 'Vehicle not found or unauthorized.' });
+      }
+
+      const current = existing[0];
+      const newModel = model !== undefined && String(model).trim() ? String(model).trim() : current.model;
+      const newCapacity = capacity !== undefined && parseInt(capacity, 10) > 0 ? parseInt(capacity, 10) : current.capacity;
+      const newType = vehicle_type !== undefined && ['sedan', 'suv', 'hatchback', 'auto', 'bike'].includes(String(vehicle_type).toLowerCase().trim())
+        ? String(vehicle_type).toLowerCase().trim()
+        : current.vehicle_type;
+      const newStatus = status !== undefined && ['active', 'inactive'].includes(status) ? status : current.status;
+
+      await pool.execute(
+        `UPDATE vehicles SET model = ?, capacity = ?, vehicle_type = ?, status = ? WHERE vehicle_id = ?`,
+        [newModel, newCapacity, newType, newStatus, vehicleId]
+      );
+
+      await logAction(pool, guard.user.user_id, 'UPDATE_VEHICLE', `Updated vehicle #${vehicleId}`, getClientIp(req));
+
+      return req.sendJSON(200, {
+        success: true,
+        message: 'Vehicle updated successfully.',
+        vehicle: {
+          vehicle_id: vehicleId,
+          vehicle_number: current.vehicle_number,
+          vehicle_type: newType,
+          model: newModel,
+          capacity: newCapacity,
+          status: newStatus
+        }
+      });
+    } catch (err) {
+      console.error('[driver/vehicles PUT]', err);
+      return req.sendJSON(500, { success: false, message: 'Failed to update vehicle.' });
+    }
+  });
+
+  router.delete('/api/driver/vehicles/:id', async (req, res) => {
+    const guard = requireRole(['driver'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    const vehicleId = parseInt(req.params.id, 10);
+    if (!vehicleId) return req.sendJSON(400, { success: false, message: 'Invalid vehicle ID.' });
+
+    try {
+      const { driver } = await getDriverDetails(pool, guard.user.user_id);
+
+      const [existing] = await pool.execute(
+        'SELECT * FROM vehicles WHERE vehicle_id = ? AND driver_id = ? LIMIT 1',
+        [vehicleId, driver.driver_id]
+      );
+      if (existing.length === 0) {
+        return req.sendJSON(404, { success: false, message: 'Vehicle not found or unauthorized.' });
+      }
+
+      // Check if trips exist referencing this vehicle
+      const [trips] = await pool.execute(
+        'SELECT trip_id FROM trips WHERE vehicle_id = ? LIMIT 1',
+        [vehicleId]
+      );
+
+      if (trips.length > 0) {
+        await pool.execute('UPDATE vehicles SET status = "inactive" WHERE vehicle_id = ?', [vehicleId]);
+        await logAction(pool, guard.user.user_id, 'DEACTIVATE_VEHICLE', `Deactivated vehicle #${vehicleId} (has trip history)`, getClientIp(req));
+        return req.sendJSON(200, { success: true, message: 'Vehicle has trip history and was marked inactive.' });
+      } else {
+        await pool.execute('DELETE FROM vehicles WHERE vehicle_id = ?', [vehicleId]);
+        await logAction(pool, guard.user.user_id, 'DELETE_VEHICLE', `Deleted vehicle #${vehicleId}`, getClientIp(req));
+        return req.sendJSON(200, { success: true, message: 'Vehicle removed successfully.' });
+      }
+    } catch (err) {
+      console.error('[driver/vehicles DELETE]', err);
+      return req.sendJSON(500, { success: false, message: 'Failed to delete vehicle.' });
     }
   });
 };
