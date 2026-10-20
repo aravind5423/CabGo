@@ -207,19 +207,19 @@ cab-booking/                          ← project root
 **Goal**: Drivers manage vehicles; passengers rate completed trips
 
 #### Commit 1 — `feat(api): vehicle CRUD + profile APIs`
-- [ ] `GET/POST/PUT/DELETE /api/driver/vehicles`
-- [ ] `GET/PUT /api/driver/profile`
-- [ ] `GET/PUT /api/passenger/profile`
+- [x] `GET/POST/PUT/DELETE /api/driver/vehicles`
+- [x] `GET/PUT /api/driver/profile`
+- [x] `GET/PUT /api/passenger/profile`
 
 #### Commit 2 — `feat(ui): vehicles.html + profile pages`
-- [ ] Vehicles: table + Add/Edit modal + Delete → Fetch CRUD, DOM update
-- [ ] Profile pages (driver + passenger): editable form, success toast on save
+- [x] Vehicles: table + Add/Edit modal + Delete → Fetch CRUD, DOM update
+- [x] Profile pages (driver + passenger): editable form, success toast on save
 
 #### Commit 3 — `feat(api+ui): ratings & reviews module`
-- [ ] `POST /api/ratings` — submit after trip complete
-- [ ] `GET /api/ratings/driver/:id` / `GET /api/ratings/passenger/:id`
-- [ ] Star-rating widget post-trip modal
-- [ ] Driver profile: average rating + reviews list (DOM rendered)
+- [x] `POST /api/ratings` — submit after trip complete
+- [x] `GET /api/ratings/driver/:id` / `GET /api/ratings/passenger/:id`
+- [x] Star-rating widget post-trip modal
+- [x] Driver profile: average rating + reviews list (DOM rendered)
 
 ---
 

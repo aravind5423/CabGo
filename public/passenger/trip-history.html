@@ -329,9 +329,77 @@
               <span style="color: #F59E0B;">₹${fare}</span>
             </div>
           </div>
+
+          ${trip.rating ? `
+            <div style="background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 0.75rem 1rem; margin-top: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.08);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.82rem; color: #94A3B8;">Your Driver Rating</span>
+                <span style="color: #F59E0B; font-size: 1rem; letter-spacing: 0.05em;">${'★'.repeat(trip.rating)}${'☆'.repeat(5 - trip.rating)}</span>
+              </div>
+              ${trip.review_comment ? `<div style="font-size: 0.85rem; color: #E2E8F0; margin-top: 0.35rem; font-style: italic;">"${trip.review_comment}"</div>` : ''}
+            </div>
+          ` : (trip.request_status === 'completed' && trip.trip_id ? `
+            <div id="receiptRatingBox" style="background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 0.75rem 1rem; margin-top: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.08); text-align: center;">
+              <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 0.4rem;">Rate your driver for this trip</div>
+              <div id="receiptStars" style="display: flex; justify-content: center; gap: 0.4rem; font-size: 1.6rem; cursor: pointer; margin-bottom: 0.5rem;">
+                <span class="rc-star active" data-val="1" style="color: #F59E0B;">★</span>
+                <span class="rc-star active" data-val="2" style="color: #F59E0B;">★</span>
+                <span class="rc-star active" data-val="3" style="color: #F59E0B;">★</span>
+                <span class="rc-star active" data-val="4" style="color: #F59E0B;">★</span>
+                <span class="rc-star active" data-val="5" style="color: #F59E0B;">★</span>
+              </div>
+              <input type="text" id="receiptCommentInput" placeholder="Optional praise or feedback..." style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 8px; padding: 0.45rem 0.75rem; width: 100%; box-sizing: border-box; font-size: 0.82rem; margin-bottom: 0.5rem; outline: none;" />
+              <button id="submitReceiptRateBtn" class="btn btn-primary btn-sm" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;">Submit Rating</button>
+            </div>
+          ` : '')}
         `;
 
         modal.style.display = 'flex';
+
+        if (!trip.rating && trip.request_status === 'completed' && trip.trip_id) {
+          let selectedR = 5;
+          const stars = document.querySelectorAll('.rc-star');
+          function updateRStars(v) {
+            stars.forEach(s => {
+              const val = parseInt(s.dataset.val, 10);
+              s.style.color = val <= v ? '#F59E0B' : '#475569';
+            });
+          }
+          stars.forEach(s => {
+            s.addEventListener('click', () => {
+              selectedR = parseInt(s.dataset.val, 10);
+              updateRStars(selectedR);
+            });
+            s.addEventListener('mouseenter', () => updateRStars(parseInt(s.dataset.val, 10)));
+          });
+          document.getElementById('receiptStars')?.addEventListener('mouseleave', () => updateRStars(selectedR));
+
+          document.getElementById('submitReceiptRateBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('submitReceiptRateBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+            const comment = document.getElementById('receiptCommentInput').value.trim();
+            try {
+              const res = await API.post('/api/ratings', {
+                trip_id: trip.trip_id,
+                rating: selectedR,
+                comment: comment
+              });
+              if (res.success) {
+                API.toast('Rating submitted! Thank you.', 'success');
+                fetchHistory();
+                closeModal();
+              } else {
+                API.toast(res.message || 'Failed to submit rating', 'error');
+              }
+            } catch {
+              API.toast('Network error submitting rating', 'error');
+            } finally {
+              btn.disabled = false;
+              btn.textContent = 'Submit Rating';
+            }
+          });
+        }
       }
 
       function closeModal() {

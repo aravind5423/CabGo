@@ -29,6 +29,7 @@ const Router         = require('./router');
 const authRoute      = require('./routes/auth');
 const passengerRoute = require('./routes/passenger');
 const driverRoute    = require('./routes/driver');
+const ratingsRoute   = require('./routes/ratings');
 // Day 7+ routes:
 // const adminRoute     = require('./routes/admin');
 // const superRoute     = require('./routes/superadmin');
@@ -37,6 +38,7 @@ const router = new Router();
 authRoute(router);
 passengerRoute(router);
 driverRoute(router);
+ratingsRoute(router);
 // Day 7+:
 // adminRoute(router);
 // superRoute(router);

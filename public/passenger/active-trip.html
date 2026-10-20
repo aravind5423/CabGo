@@ -106,6 +106,20 @@
       0% { transform: scale(0.7); opacity: 1; }
       100% { transform: scale(2.4); opacity: 0; }
     }
+
+    /* Star rating widget */
+    .star-btn {
+      color: #475569;
+      font-size: 2.2rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      display: inline-block;
+    }
+    .star-btn:hover, .star-btn.active {
+      color: #F59E0B;
+      transform: scale(1.15);
+    }
   </style>
 </head>
 <body class="app-layout">
@@ -253,10 +267,38 @@
             <div id="completedState" style="display: none; text-align: center; padding: 1.5rem 0;">
               <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎉</div>
               <h3 style="font-size: 1.3rem; color: #10B981; margin-bottom: 0.35rem;">Trip Completed!</h3>
-              <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 1.5rem;">
+              <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 1.25rem;">
                 Thank you for riding with CabGo. Your receipt is ready.
               </p>
-              <a href="/passenger/trip-history.html" class="btn btn-primary">View Trip History & Receipt</a>
+
+              <!-- Star Rating Box -->
+              <div id="tripRatingBox" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 1.25rem; margin-bottom: 1.25rem; text-align: center;">
+                <h4 style="font-size: 1.05rem; color: #fff; margin: 0 0 0.35rem 0;">Rate Your Driver</h4>
+                <p style="color: #94A3B8; font-size: 0.82rem; margin: 0 0 0.85rem 0;" id="ratingPromptText">How was your trip experience with your driver?</p>
+
+                <div class="star-rating-widget" id="starRatingWidget" style="display: flex; justify-content: center; gap: 0.6rem; margin-bottom: 0.85rem;">
+                  <span class="star-btn" data-value="1">★</span>
+                  <span class="star-btn" data-value="2">★</span>
+                  <span class="star-btn" data-value="3">★</span>
+                  <span class="star-btn" data-value="4">★</span>
+                  <span class="star-btn" data-value="5">★</span>
+                </div>
+
+                <textarea id="ratingComment" rows="2" placeholder="Leave an optional comment or praise for the driver..." style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 10px; padding: 0.75rem; width: 100%; box-sizing: border-box; resize: none; margin-bottom: 0.85rem; font-family: inherit; font-size: 0.85rem;"></textarea>
+
+                <button type="button" id="submitRatingBtn" class="btn btn-primary btn-sm" style="width: 100%; padding: 0.65rem;">
+                  Submit Driver Rating
+                </button>
+              </div>
+
+              <!-- Rating Submitted Confirmation -->
+              <div id="ratingSubmittedBox" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 14px; padding: 1rem; margin-bottom: 1.25rem; text-align: center;">
+                <span style="font-size: 1.5rem;">⭐</span>
+                <h4 style="color: #10B981; margin: 0.25rem 0; font-size: 0.95rem;">Rating Recorded</h4>
+                <p style="color: #94A3B8; font-size: 0.82rem; margin: 0;" id="ratingSubmittedText">Thank you for helping us maintain top service quality!</p>
+              </div>
+
+              <a href="/passenger/trip-history.html" class="btn btn-outline" style="width: 100%;">View Trip History & Receipt</a>
             </div>
 
             <!-- Cancelled State (when status = cancelled) -->
@@ -446,11 +488,100 @@
           progress.style.width = '100%';
           completedBox.style.display = 'block';
           stopPolling();
+
+          if (ride.trip && ride.trip.trip_id) {
+            currentTripId = ride.trip.trip_id;
+            checkTripRating(currentTripId);
+          }
         } else if (ride.status === 'cancelled') {
           cancelledBox.style.display = 'block';
           stopPolling();
         }
       }
+
+      // ── Star Rating Logic ────────────────────────────────────
+      let selectedRating = 5;
+      let currentTripId = null;
+
+      const starButtons = document.querySelectorAll('.star-btn');
+      function setStarDisplay(rating) {
+        starButtons.forEach(btn => {
+          const val = parseInt(btn.dataset.value, 10);
+          if (val <= rating) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+      setStarDisplay(selectedRating);
+
+      starButtons.forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+          const val = parseInt(btn.dataset.value, 10);
+          setStarDisplay(val);
+        });
+        btn.addEventListener('click', () => {
+          selectedRating = parseInt(btn.dataset.value, 10);
+          setStarDisplay(selectedRating);
+        });
+      });
+
+      document.getElementById('starRatingWidget').addEventListener('mouseleave', () => {
+        setStarDisplay(selectedRating);
+      });
+
+      async function checkTripRating(tripId) {
+        try {
+          const res = await API.get(`/api/ratings/trip/${tripId}`);
+          if (res.success && res.rated) {
+            document.getElementById('tripRatingBox').style.display = 'none';
+            document.getElementById('ratingSubmittedBox').style.display = 'block';
+            document.getElementById('ratingSubmittedText').textContent =
+              `You rated this trip ${'★'.repeat(res.review.rating)}${'☆'.repeat(5 - res.review.rating)}` +
+              (res.review.comment ? ` — "${res.review.comment}"` : '');
+          }
+        } catch (e) {
+          console.error('[checkTripRating]', e);
+        }
+      }
+
+      document.getElementById('submitRatingBtn').addEventListener('click', async () => {
+        if (!currentTripId) {
+          API.toast('Trip ID missing.', 'error');
+          return;
+        }
+
+        const btn = document.getElementById('submitRatingBtn');
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        const comment = document.getElementById('ratingComment').value.trim();
+
+        try {
+          const res = await API.post('/api/ratings', {
+            trip_id: currentTripId,
+            rating: selectedRating,
+            comment: comment
+          });
+
+          if (res.success) {
+            API.toast('Rating submitted! Thank you.', 'success');
+            document.getElementById('tripRatingBox').style.display = 'none';
+            document.getElementById('ratingSubmittedBox').style.display = 'block';
+            document.getElementById('ratingSubmittedText').textContent =
+              `You rated this trip ${'★'.repeat(selectedRating)}${'☆'.repeat(5 - selectedRating)}` +
+              (comment ? ` — "${comment}"` : '');
+          } else {
+            API.toast(res.message || 'Failed to submit rating.', 'error');
+          }
+        } catch {
+          API.toast('Error submitting rating.', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Submit Driver Rating';
+        }
+      });
 
       function populateDriver(trip) {
         if (!trip) return;
