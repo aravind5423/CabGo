@@ -1,1 +1,1302 @@
-<!-- TODO: fare rules -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fare Rules & Service Areas — CabGo Operations</title>
+  <meta name="description" content="Configure vehicle tariffs, base rates, distance fees, and geographic service zones for CabGo." />
+  
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <script src="/js/router-guard.js" data-role="admin,superadmin"></script>
+  
+  <style>
+    /* ── Tab System ────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.05);
+      padding: 0.35rem;
+      border-radius: var(--radius-pill);
+      width: fit-content;
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.6rem 1.4rem;
+      border-radius: var(--radius-pill);
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text-dark);
+    }
+    .tab-btn.active {
+      background: #FFFFFF;
+      color: var(--text-dark);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* ── KPI Stat Pods ──────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .kpi-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-lg);
+      padding: 1.35rem 1.5rem;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    }
+    .kpi-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kpi-value {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--text-dark);
+      line-height: 1.1;
+      margin-bottom: 0.35rem;
+    }
+    .kpi-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* ── Content Card & Data Table ──────────────────────────── */
+    .panel-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .panel-title {
+      font-family: var(--font-heading);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .panel-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Controls Row (Search & Filters) ────────────────────── */
+    .controls-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-input {
+      background: #F6F7F3;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--radius-pill);
+      padding: 0.55rem 1.15rem;
+      font-size: 0.88rem;
+      font-family: inherit;
+      color: var(--text-dark);
+      outline: none;
+      min-width: 220px;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      background: #FFFFFF;
+      border-color: #111315;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
+    }
+    .filter-select {
+      background: #F6F7F3;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--radius-pill);
+      padding: 0.55rem 1rem;
+      font-size: 0.88rem;
+      font-family: inherit;
+      color: var(--text-dark);
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* ── Modern Table Styles ────────────────────────────────── */
+    .data-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.92rem;
+      text-align: left;
+    }
+    .data-table th {
+      background: #F8F9F5;
+      padding: 1rem 1.15rem;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    }
+    .data-table th:first-child {
+      border-top-left-radius: 12px;
+      border-bottom-left-radius: 12px;
+    }
+    .data-table th:last-child {
+      border-top-right-radius: 12px;
+      border-bottom-right-radius: 12px;
+      text-align: right;
+    }
+    .data-table td {
+      padding: 1.15rem 1.15rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+      color: var(--text-dark);
+      vertical-align: middle;
+    }
+    .data-table tr:hover td {
+      background: rgba(246, 247, 243, 0.6);
+    }
+    .data-table td:last-child {
+      text-align: right;
+    }
+
+    /* ── Vehicle Badges ─────────────────────────────────────── */
+    .badge-vehicle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-pill);
+      font-weight: 800;
+      font-size: 0.85rem;
+      text-transform: capitalize;
+    }
+    .badge-sedan { background: #EEF2FF; color: #4338CA; }
+    .badge-suv { background: #FDF2F8; color: #BE185D; }
+    .badge-hatchback { background: #F0FDF4; color: #15803D; }
+    .badge-auto { background: #FFFBEB; color: #B45309; }
+    .badge-bike { background: #F3E8FF; color: #7E22CE; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-pill);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .status-pill.active {
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+    }
+    .status-pill.inactive {
+      background: rgba(100, 116, 139, 0.12);
+      color: #475569;
+    }
+
+    /* ── Action Buttons ─────────────────────────────────────── */
+    .action-btn-group {
+      display: inline-flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .action-btn {
+      background: #F1F3EE;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-dark);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+    }
+    .action-btn:hover {
+      background: #E2E8F0;
+      transform: translateY(-1px);
+    }
+    .action-btn.btn-delete {
+      color: #DC2626;
+      background: #FEE2E2;
+    }
+    .action-btn.btn-delete:hover {
+      background: #FCA5A5;
+      color: #991B1B;
+    }
+
+    /* ── Tariff Simulator Card ──────────────────────────────── */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 2rem;
+    }
+    @media (max-width: 900px) {
+      .simulator-grid { grid-template-columns: 1fr; }
+    }
+    .calc-input-box {
+      background: #F8F9F5;
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    .calc-output-box {
+      background: #111315;
+      color: #FFFFFF;
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+    .calc-output-box::before {
+      content: '';
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 140px; height: 140px;
+      background: radial-gradient(circle, var(--accent-lime-subtle) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── Modals ─────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(17, 19, 21, 0.65);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal-card {
+      background: #FFFFFF;
+      border-radius: var(--radius-xl);
+      width: 100%;
+      max-width: 520px;
+      padding: 2rem;
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.2);
+      animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlideIn {
+      from { transform: translateY(16px) scale(0.96); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .modal-title {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #111315;
+    }
+    .modal-close-btn {
+      background: #F1F3EE;
+      border: none;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      color: #64748B;
+      transition: all 0.2s;
+    }
+    .modal-close-btn:hover {
+      background: #E2E8F0;
+      color: #111315;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1.15rem;
+    }
+    .form-group label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #1E293B;
+    }
+    .form-input, .form-select {
+      background: #F7F8F4;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      color: #111315;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .form-input:focus, .form-select:focus {
+      background: #FFFFFF;
+      border-color: #111315;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+    }
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Pill Navbar -->
+  <nav class="dash-navbar" aria-label="Admin Navigation">
+    <a href="/admin/dashboard.html" class="dash-brand">
+      <div class="dash-brand-icon">🚖</div>
+      <span>CabGo <span style="font-weight:400; font-size:0.85em; opacity:0.6;">Admin</span></span>
+    </a>
+
+    <ul class="dash-nav-links">
+      <li><a href="/admin/dashboard.html" class="dash-nav-link">📊 Overview</a></li>
+      <li><a href="/admin/manage-passengers.html" class="dash-nav-link">👥 Passengers</a></li>
+      <li><a href="/admin/manage-drivers.html" class="dash-nav-link">🚘 Drivers</a></li>
+      <li><a href="/admin/manage-vehicles.html" class="dash-nav-link">🚙 Fleet</a></li>
+      <li><a href="/admin/manage-trips.html" class="dash-nav-link">🗺️ Trips</a></li>
+      <li><a href="/admin/fare-rules.html" class="dash-nav-link active">⚡ Fare & Areas</a></li>
+      <li><a href="/admin/reports.html" class="dash-nav-link">📈 Reports</a></li>
+    </ul>
+
+    <div class="dash-user-menu" style="display:flex; align-items:center; gap:0.75rem;">
+      <div style="text-align:right;">
+        <div data-user-name style="font-size:0.85rem; font-weight:800; color:var(--text-dark);">Admin</div>
+        <div data-user-role style="font-size:0.75rem; color:var(--text-muted);">Operations</div>
+      </div>
+      <button id="logoutBtn" class="action-btn" style="border-radius:var(--radius-pill); padding:0.45rem 0.9rem;">
+        🚪 Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    <div class="app-container">
+
+      <!-- Hero / Header Row -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:2rem; padding-top:1rem;">
+        <div>
+          <h1 style="font-family:var(--font-heading); font-size:2.2rem; font-weight:900; color:var(--text-dark); letter-spacing:-0.03em;">
+            Pricing Rules & Service Zones
+          </h1>
+          <p style="color:var(--text-muted); font-size:1rem; margin-top:0.35rem;">
+            Govern vehicle category rates, base tariffs, cancellation fees, and regional operational boundaries.
+          </p>
+        </div>
+
+        <div style="display:flex; gap:0.75rem;">
+          <button id="btnOpenAddFare" class="btn" style="background:#111315; color:#FFFFFF; border-radius:var(--radius-pill); font-weight:700; padding:0.65rem 1.4rem; display:flex; align-items:center; gap:0.4rem; cursor:pointer; border:none; transition:all 0.2s;">
+            <span>➕</span> Add Fare Rule
+          </button>
+          <button id="btnOpenAddArea" class="btn" style="background:var(--accent-lime); color:#111315; border-radius:var(--radius-pill); font-weight:800; padding:0.65rem 1.4rem; display:flex; align-items:center; gap:0.4rem; cursor:pointer; border:none; transition:all 0.2s;">
+            <span>📍</span> Add Service Area
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Stat Grid -->
+      <section class="kpi-grid" aria-label="Operations Overview Metrics">
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Vehicle Fare Classes</span>
+            <span>🚖</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalRules">--</div>
+          <div class="kpi-sub" id="kpiActiveRules">Loading tariffs...</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Operational Service Areas</span>
+            <span>📍</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalAreas">--</div>
+          <div class="kpi-sub" id="kpiCitiesCount">Coverage zones active</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Average Base Tariff</span>
+            <span>💵</span>
+          </div>
+          <div class="kpi-value" id="kpiAvgBase">₹--</div>
+          <div class="kpi-sub">Standard boarding fare</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Average KM Rate</span>
+            <span>📈</span>
+          </div>
+          <div class="kpi-value" id="kpiAvgKm">₹--/km</div>
+          <div class="kpi-sub">Across active vehicle classes</div>
+        </div>
+      </section>
+
+      <!-- Navigation Tabs -->
+      <div class="tab-bar" role="tablist">
+        <button id="tabBtnFares" class="tab-btn active" role="tab" aria-selected="true">
+          <span>🚖</span> Vehicle Fare Rules
+        </button>
+        <button id="tabBtnAreas" class="tab-btn" role="tab" aria-selected="false">
+          <span>📍</span> Service Areas & Zones
+        </button>
+        <button id="tabBtnSimulator" class="tab-btn" role="tab" aria-selected="false">
+          <span>⚡</span> Live Fare Simulator
+        </button>
+      </div>
+
+      <!-- ── SECTION 1: FARE RULES ────────────────────────────── -->
+      <section id="panelFares" class="panel-card" role="tabpanel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Vehicle Tariff Specifications</h2>
+            <p class="panel-subtitle">Rule formula: <code>Fare = Base + (Distance × KM Rate) + (Duration × Minute Rate)</code></p>
+          </div>
+          <div class="controls-row">
+            <select id="filterFareStatus" class="filter-select">
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+            <button id="btnRefreshFares" class="action-btn" title="Refresh Table">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data-table" id="fareRulesTable">
+            <thead>
+              <tr>
+                <th>Vehicle Class</th>
+                <th>Base Fare</th>
+                <th>Per KM Rate</th>
+                <th>Per Min Rate</th>
+                <th>Cancellation Fee</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fareRulesBody">
+              <tr>
+                <td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                  ⏳ Loading fare specifications...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── SECTION 2: SERVICE AREAS ─────────────────────────── -->
+      <section id="panelAreas" class="panel-card" role="tabpanel" style="display:none;">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Geographic Coverage & Service Areas</h2>
+            <p class="panel-subtitle">Defines municipal boundaries and zones where rides can be requested and dispatched.</p>
+          </div>
+          <div class="controls-row">
+            <input type="text" id="searchAreaInput" class="search-input" placeholder="🔍 Search area or city..." />
+            <select id="filterCitySelect" class="filter-select">
+              <option value="">All Cities</option>
+            </select>
+            <select id="filterAreaStatus" class="filter-select">
+              <option value="">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+            <button id="btnRefreshAreas" class="action-btn" title="Refresh Areas">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data-table" id="serviceAreasTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Zone / Area Name</th>
+                <th>City</th>
+                <th>State</th>
+                <th>Operating Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="serviceAreasBody">
+              <tr>
+                <td colspan="6" style="text-align:center; padding:3rem; color:var(--text-muted);">
+                  ⏳ Loading service areas...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── SECTION 3: FARE SIMULATOR ────────────────────────── -->
+      <section id="panelSimulator" class="panel-card" role="tabpanel" style="display:none;">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Interactive Tariff Calculator & Simulator</h2>
+            <p class="panel-subtitle">Simulate exact fare breakdowns and test rate modifications under varying trip distances and traffic durations.</p>
+          </div>
+        </div>
+
+        <div class="simulator-grid">
+          <!-- Controls Box -->
+          <div class="calc-input-box">
+            <h3 style="font-family:var(--font-heading); font-size:1.15rem; font-weight:800; margin-bottom:1.25rem;">
+              Trip Parameters
+            </h3>
+
+            <div class="form-group">
+              <label for="simVehicleType">Select Vehicle Class</label>
+              <select id="simVehicleType" class="form-select">
+                <option value="sedan">🚗 Sedan</option>
+                <option value="suv">🚙 SUV</option>
+                <option value="hatchback">🏎️ Hatchback</option>
+                <option value="auto">🛺 Auto Rickshaw</option>
+                <option value="bike">🏍️ Bike</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-top:1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label for="simDistanceSlider">Estimated Distance</label>
+                <span id="simDistLabel" style="font-weight:800; color:var(--text-dark);">10.0 km</span>
+              </div>
+              <input type="range" id="simDistanceSlider" min="1" max="100" step="0.5" value="10" style="width:100%; accent-color:#111315; cursor:pointer;" />
+            </div>
+
+            <div class="form-group" style="margin-top:1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label for="simDurationSlider">Estimated Ride Duration (Traffic)</label>
+                <span id="simDurLabel" style="font-weight:800; color:var(--text-dark);">25 mins</span>
+              </div>
+              <input type="range" id="simDurationSlider" min="0" max="180" step="1" value="25" style="width:100%; accent-color:#111315; cursor:pointer;" />
+            </div>
+          </div>
+
+          <!-- Output Receipt Box -->
+          <div class="calc-output-box">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                <span style="font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent-lime);">
+                  Live Price Simulation
+                </span>
+                <span id="simCategoryBadge" class="badge-vehicle badge-sedan" style="font-size:0.75rem;">Sedan</span>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:0.85rem; border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:1.5rem; margin-bottom:1.5rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.92rem; color:#A0AEC0;">
+                  <span>Base Flag-drop Fare</span>
+                  <span id="outBaseFare" style="font-weight:700; color:#FFFFFF;">₹100.00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.92rem; color:#A0AEC0;">
+                  <span>Distance Fare (<span id="outDistKm">10.0</span> km × ₹<span id="outKmRate">18</span>)</span>
+                  <span id="outDistCost" style="font-weight:700; color:#FFFFFF;">₹180.00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.92rem; color:#A0AEC0;">
+                  <span>Time Fare (<span id="outDurMins">25</span> min × ₹<span id="outMinRate">2.0</span>)</span>
+                  <span id="outTimeCost" style="font-weight:700; color:#FFFFFF;">₹50.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                  <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:#A0AEC0;">Total Estimated Fare</div>
+                  <div style="font-size:0.75rem; color:#718096;">Includes service taxes & platform fees</div>
+                </div>
+                <div id="outTotalFare" style="font-family:var(--font-heading); font-size:2.5rem; font-weight:900; color:var(--accent-lime); line-height:1;">
+                  ₹330.00
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ── MODAL: ADD / EDIT FARE RULE ────────────────────────── -->
+  <div id="fareRuleModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="fareModalTitle" class="modal-title">Configure Fare Rule</h3>
+        <button type="button" class="modal-close-btn" id="btnCloseFareModal">✕</button>
+      </div>
+
+      <form id="fareRuleForm">
+        <input type="hidden" id="fareRuleId" value="" />
+
+        <div class="form-group">
+          <label for="fareVehicleType">Vehicle Category</label>
+          <select id="fareVehicleType" class="form-select" required>
+            <option value="sedan">🚗 Sedan (Comfort 4-seater)</option>
+            <option value="suv">🚙 SUV (Prime 6/7-seater)</option>
+            <option value="hatchback">🏎️ Hatchback (Economy 4-seater)</option>
+            <option value="auto">🛺 Auto Rickshaw (Affordable 3-seater)</option>
+            <option value="bike">🏍️ Bike (Quick Single-rider)</option>
+          </select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="fareBaseFare">Base Fare (₹)</label>
+            <input type="number" id="fareBaseFare" class="form-input" min="0" step="0.5" required placeholder="e.g. 100" />
+          </div>
+          <div class="form-group">
+            <label for="farePerKmRate">Per KM Rate (₹)</label>
+            <input type="number" id="farePerKmRate" class="form-input" min="0" step="0.5" required placeholder="e.g. 18" />
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="farePerMinRate">Per Minute Rate (₹)</label>
+            <input type="number" id="farePerMinRate" class="form-input" min="0" step="0.25" required placeholder="e.g. 2.0" />
+          </div>
+          <div class="form-group">
+            <label for="fareCancellationFee">Cancellation Fee (₹)</label>
+            <input type="number" id="fareCancellationFee" class="form-input" min="0" step="1" required placeholder="e.g. 50" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="fareStatus">Operational Status</label>
+          <select id="fareStatus" class="form-select" required>
+            <option value="active">Active (Available for booking)</option>
+            <option value="inactive">Inactive (Temporarily suspended)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+          <button type="button" id="btnCancelFareModal" class="action-btn" style="padding:0.75rem 1.25rem;">Cancel</button>
+          <button type="submit" id="btnSubmitFareRule" class="btn" style="background:#111315; color:#FFFFFF; border-radius:var(--radius-pill); font-weight:800; padding:0.75rem 1.75rem; border:none; cursor:pointer;">
+            Save Fare Rule
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MODAL: ADD / EDIT SERVICE AREA ──────────────────────── -->
+  <div id="serviceAreaModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="areaModalTitle" class="modal-title">Register Service Area</h3>
+        <button type="button" class="modal-close-btn" id="btnCloseAreaModal">✕</button>
+      </div>
+
+      <form id="serviceAreaForm">
+        <input type="hidden" id="serviceAreaId" value="" />
+
+        <div class="form-group">
+          <label for="areaName">Area / Zone Name</label>
+          <input type="text" id="areaName" class="form-input" required placeholder="e.g. OMR & IT Corridor" />
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="areaCity">City</label>
+            <input type="text" id="areaCity" class="form-input" required placeholder="e.g. Chennai" />
+          </div>
+          <div class="form-group">
+            <label for="areaState">State</label>
+            <input type="text" id="areaState" class="form-input" required placeholder="e.g. Tamil Nadu" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="areaStatus">Operating Status</label>
+          <select id="areaStatus" class="form-select" required>
+            <option value="active">Active (Rides allowed)</option>
+            <option value="inactive">Inactive (Suspended coverage)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+          <button type="button" id="btnCancelAreaModal" class="action-btn" style="padding:0.75rem 1.25rem;">Cancel</button>
+          <button type="submit" id="btnSubmitArea" class="btn" style="background:var(--accent-lime); color:#111315; border-radius:var(--radius-pill); font-weight:800; padding:0.75rem 1.75rem; border:none; cursor:pointer;">
+            Save Service Area
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script>
+    'use strict';
+
+    // State cache
+    let cachedFareRules = [];
+    let cachedServiceAreas = [];
+
+    // Category vehicle icons and class helpers
+    const VEHICLE_META = {
+      sedan:     { icon: '🚗', name: 'Sedan', class: 'badge-sedan' },
+      suv:       { icon: '🚙', name: 'SUV', class: 'badge-suv' },
+      hatchback: { icon: '🏎️', name: 'Hatchback', class: 'badge-hatchback' },
+      auto:      { icon: '🛺', name: 'Auto', class: 'badge-auto' },
+      bike:      { icon: '🏍️', name: 'Bike', class: 'badge-bike' }
+    };
+
+    // ── Logout ──────────────────────────────────────────────
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try { await API.post('/api/auth/logout'); } catch {}
+      sessionStorage.clear();
+      window.location.href = '/login.html';
+    });
+
+    // ── Tab Switching ────────────────────────────────────────
+    const tabFares = document.getElementById('tabBtnFares');
+    const tabAreas = document.getElementById('tabBtnAreas');
+    const tabSimulator = document.getElementById('tabBtnSimulator');
+
+    const panelFares = document.getElementById('panelFares');
+    const panelAreas = document.getElementById('panelAreas');
+    const panelSimulator = document.getElementById('panelSimulator');
+
+    function switchTab(activeTab, activePanel) {
+      [tabFares, tabAreas, tabSimulator].forEach(t => t.classList.remove('active'));
+      [panelFares, panelAreas, panelSimulator].forEach(p => p.style.display = 'none');
+
+      activeTab.classList.add('active');
+      activePanel.style.display = 'block';
+    }
+
+    tabFares.addEventListener('click', () => switchTab(tabFares, panelFares));
+    tabAreas.addEventListener('click', () => switchTab(tabAreas, panelAreas));
+    tabSimulator.addEventListener('click', () => {
+      switchTab(tabSimulator, panelSimulator);
+      runSimulation();
+    });
+
+    // ── Load Fare Rules ──────────────────────────────────────
+    async function loadFareRules() {
+      try {
+        const res = await API.get('/api/admin/fare-rules');
+        if (!res.ok) {
+          API.toast(res.message || 'Failed to load fare rules.', 'error');
+          return;
+        }
+
+        cachedFareRules = res.rules || [];
+        const summary = res.summary || {};
+
+        // Update KPI metrics
+        document.getElementById('kpiTotalRules').textContent = summary.total_rules || cachedFareRules.length;
+        document.getElementById('kpiActiveRules').textContent = `${summary.active_count || 0} active, ${summary.inactive_count || 0} paused`;
+        document.getElementById('kpiAvgBase').textContent = `₹${parseFloat(summary.avg_base_fare || 0).toFixed(2)}`;
+        document.getElementById('kpiAvgKm').textContent = `₹${parseFloat(summary.avg_per_km_rate || 0).toFixed(2)}/km`;
+
+        renderFareRulesTable();
+        populateSimulatorOptions();
+      } catch (err) {
+        console.error('[loadFareRules]', err);
+        API.toast('Network error loading fare rules', 'error');
+      }
+    }
+
+    function renderFareRulesTable() {
+      const tbody = document.getElementById('fareRulesBody');
+      const filter = document.getElementById('filterFareStatus').value;
+
+      let list = cachedFareRules;
+      if (filter !== 'all') {
+        list = list.filter(r => r.status === filter);
+      }
+
+      if (list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">
+              No fare rules found matching filter.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(r => {
+        const meta = VEHICLE_META[r.vehicle_type] || { icon: '🚘', name: r.vehicle_type, class: 'badge-sedan' };
+        return `
+          <tr data-id="${r.fare_id}">
+            <td>
+              <span class="badge-vehicle ${meta.class}">
+                <span>${meta.icon}</span>
+                <span>${meta.name}</span>
+              </span>
+            </td>
+            <td style="font-weight:700; font-family:var(--font-heading); font-size:1.05rem;">
+              ₹${parseFloat(r.base_fare).toFixed(2)}
+            </td>
+            <td style="font-weight:700;">₹${parseFloat(r.per_km_rate).toFixed(2)}/km</td>
+            <td style="font-weight:600; color:var(--text-muted);">₹${parseFloat(r.per_minute_rate).toFixed(2)}/min</td>
+            <td style="color:#DC2626; font-weight:600;">₹${parseFloat(r.cancellation_fee).toFixed(2)}</td>
+            <td>
+              <span class="status-pill ${r.status}">
+                ● ${r.status}
+              </span>
+            </td>
+            <td>
+              <div class="action-btn-group">
+                <button class="action-btn" onclick="editFareRule(${r.fare_id})" title="Edit Rates">
+                  ✏️ Edit
+                </button>
+                <button class="action-btn" onclick="toggleFareStatus(${r.fare_id}, '${r.status}')" title="Toggle Status">
+                  ${r.status === 'active' ? '⏸️ Pause' : '▶️ Activate'}
+                </button>
+                <button class="action-btn btn-delete" onclick="deleteFareRule(${r.fare_id}, '${meta.name}')" title="Delete Rule">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('filterFareStatus').addEventListener('change', renderFareRulesTable);
+    document.getElementById('btnRefreshFares').addEventListener('click', loadFareRules);
+
+    // ── Load Service Areas ───────────────────────────────────
+    async function loadServiceAreas() {
+      try {
+        const search = encodeURIComponent(document.getElementById('searchAreaInput').value.trim());
+        const city = encodeURIComponent(document.getElementById('filterCitySelect').value);
+        const status = encodeURIComponent(document.getElementById('filterAreaStatus').value);
+
+        let qs = [];
+        if (search) qs.push(`search=${search}`);
+        if (city) qs.push(`city=${city}`);
+        if (status) qs.push(`status=${status}`);
+        const query = qs.length > 0 ? `?${qs.join('&')}` : '';
+
+        const res = await API.get(`/api/admin/service-areas${query}`);
+        if (!res.ok) {
+          API.toast(res.message || 'Failed to load service areas.', 'error');
+          return;
+        }
+
+        cachedServiceAreas = res.areas || [];
+        const summary = res.summary || {};
+
+        document.getElementById('kpiTotalAreas').textContent = summary.total_areas || cachedServiceAreas.length;
+        document.getElementById('kpiCitiesCount').textContent = `${summary.cities_count || 1} cities covered`;
+
+        // Update City filter dropdown if needed
+        if (res.cities && res.cities.length > 0) {
+          const citySelect = document.getElementById('filterCitySelect');
+          const currentCity = citySelect.value;
+          citySelect.innerHTML = '<option value="">All Cities</option>' +
+            res.cities.map(c => `<option value="${c}" ${c === currentCity ? 'selected' : ''}>${c}</option>`).join('');
+        }
+
+        renderServiceAreasTable();
+      } catch (err) {
+        console.error('[loadServiceAreas]', err);
+        API.toast('Network error loading service areas', 'error');
+      }
+    }
+
+    function renderServiceAreasTable() {
+      const tbody = document.getElementById('serviceAreasBody');
+
+      if (cachedServiceAreas.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align:center; padding:3rem; color:var(--text-muted);">
+              No service areas found matching criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = cachedServiceAreas.map(a => `
+        <tr data-id="${a.area_id}">
+          <td style="color:var(--text-muted); font-size:0.85rem; font-weight:700;">#${a.area_id}</td>
+          <td style="font-weight:700; color:var(--text-dark);">
+            📍 ${a.area_name}
+          </td>
+          <td>
+            <span style="background:#F1F3EE; padding:0.25rem 0.65rem; border-radius:var(--radius-pill); font-weight:700; font-size:0.82rem;">
+              ${a.city}
+            </span>
+          </td>
+          <td style="color:var(--text-muted);">${a.state}</td>
+          <td>
+            <span class="status-pill ${a.status}">
+              ● ${a.status}
+            </span>
+          </td>
+          <td>
+            <div class="action-btn-group">
+              <button class="action-btn" onclick="editServiceArea(${a.area_id})" title="Edit Area">
+                ✏️ Edit
+              </button>
+              <button class="action-btn" onclick="toggleAreaStatus(${a.area_id}, '${a.status}')" title="Toggle Active">
+                ${a.status === 'active' ? '⏸️ Deactivate' : '▶️ Activate'}
+              </button>
+              <button class="action-btn btn-delete" onclick="deleteServiceArea(${a.area_id}, '${a.area_name}')" title="Delete Area">
+                🗑️
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Filters for service areas
+    let searchTimer = null;
+    document.getElementById('searchAreaInput').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadServiceAreas, 250);
+    });
+    document.getElementById('filterCitySelect').addEventListener('change', loadServiceAreas);
+    document.getElementById('filterAreaStatus').addEventListener('change', loadServiceAreas);
+    document.getElementById('btnRefreshAreas').addEventListener('click', loadServiceAreas);
+
+    // ── FARE RULE MODAL LOGIC ────────────────────────────────
+    const fareModal = document.getElementById('fareRuleModal');
+    const fareForm = document.getElementById('fareRuleForm');
+
+    function openFareModal(isEdit = false, rule = null) {
+      fareForm.reset();
+      document.getElementById('fareModalTitle').textContent = isEdit ? 'Edit Vehicle Fare Rule' : 'New Vehicle Fare Rule';
+      document.getElementById('fareRuleId').value = isEdit && rule ? rule.fare_id : '';
+
+      if (isEdit && rule) {
+        document.getElementById('fareVehicleType').value = rule.vehicle_type;
+        document.getElementById('fareVehicleType').disabled = true; // vehicle category is primary identity
+        document.getElementById('fareBaseFare').value = rule.base_fare;
+        document.getElementById('farePerKmRate').value = rule.per_km_rate;
+        document.getElementById('farePerMinRate').value = rule.per_minute_rate;
+        document.getElementById('fareCancellationFee').value = rule.cancellation_fee;
+        document.getElementById('fareStatus').value = rule.status;
+      } else {
+        document.getElementById('fareVehicleType').disabled = false;
+        document.getElementById('fareBaseFare').value = '100';
+        document.getElementById('farePerKmRate').value = '18';
+        document.getElementById('farePerMinRate').value = '2.0';
+        document.getElementById('fareCancellationFee').value = '50';
+        document.getElementById('fareStatus').value = 'active';
+      }
+
+      fareModal.classList.add('active');
+    }
+
+    function closeFareModal() {
+      fareModal.classList.remove('active');
+    }
+
+    document.getElementById('btnOpenAddFare').addEventListener('click', () => openFareModal(false));
+    document.getElementById('btnCloseFareModal').addEventListener('click', closeFareModal);
+    document.getElementById('btnCancelFareModal').addEventListener('click', closeFareModal);
+
+    window.editFareRule = function(id) {
+      const rule = cachedFareRules.find(r => r.fare_id === id);
+      if (rule) openFareModal(true, rule);
+    };
+
+    window.toggleFareStatus = async function(id, currentStatus) {
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      try {
+        const res = await API.put(`/api/admin/fare-rules/${id}`, { status: nextStatus });
+        if (res.ok) {
+          API.toast(`Tariff status updated to ${nextStatus}`, 'success');
+          await loadFareRules();
+        } else {
+          API.toast(res.message || 'Status update failed', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error updating status', 'error');
+      }
+    };
+
+    window.deleteFareRule = async function(id, name) {
+      if (!confirm(`Are you sure you want to delete the fare rule for ${name}?`)) return;
+      try {
+        const res = await API.delete(`/api/admin/fare-rules/${id}`);
+        if (res.ok) {
+          API.toast(`Fare rule for ${name} deleted.`, 'success');
+          await loadFareRules();
+        } else {
+          API.toast(res.message || 'Failed to delete fare rule', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error deleting fare rule', 'error');
+      }
+    };
+
+    fareForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('fareRuleId').value;
+      const isEdit = Boolean(id);
+
+      const payload = {
+        vehicle_type: document.getElementById('fareVehicleType').value,
+        base_fare: parseFloat(document.getElementById('fareBaseFare').value),
+        per_km_rate: parseFloat(document.getElementById('farePerKmRate').value),
+        per_minute_rate: parseFloat(document.getElementById('farePerMinRate').value),
+        cancellation_fee: parseFloat(document.getElementById('fareCancellationFee').value),
+        status: document.getElementById('fareStatus').value
+      };
+
+      const btn = document.getElementById('btnSubmitFareRule');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const url = isEdit ? `/api/admin/fare-rules/${id}` : '/api/admin/fare-rules';
+        const res = isEdit ? await API.put(url, payload) : await API.post(url, payload);
+
+        if (res.ok) {
+          API.toast(res.message || 'Fare rule saved successfully!', 'success');
+          closeFareModal();
+          await loadFareRules();
+        } else {
+          API.toast(res.message || 'Could not save fare rule', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error saving fare rule', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Fare Rule';
+      }
+    });
+
+    // ── SERVICE AREA MODAL LOGIC ─────────────────────────────
+    const areaModal = document.getElementById('serviceAreaModal');
+    const areaForm = document.getElementById('serviceAreaForm');
+
+    function openAreaModal(isEdit = false, area = null) {
+      areaForm.reset();
+      document.getElementById('areaModalTitle').textContent = isEdit ? 'Edit Service Area' : 'Register Service Area';
+      document.getElementById('serviceAreaId').value = isEdit && area ? area.area_id : '';
+
+      if (isEdit && area) {
+        document.getElementById('areaName').value = area.area_name;
+        document.getElementById('areaCity').value = area.city;
+        document.getElementById('areaState').value = area.state;
+        document.getElementById('areaStatus').value = area.status;
+      } else {
+        document.getElementById('areaCity').value = 'Chennai';
+        document.getElementById('areaState').value = 'Tamil Nadu';
+        document.getElementById('areaStatus').value = 'active';
+      }
+
+      areaModal.classList.add('active');
+    }
+
+    function closeAreaModal() {
+      areaModal.classList.remove('active');
+    }
+
+    document.getElementById('btnOpenAddArea').addEventListener('click', () => openAreaModal(false));
+    document.getElementById('btnCloseAreaModal').addEventListener('click', closeAreaModal);
+    document.getElementById('btnCancelAreaModal').addEventListener('click', closeAreaModal);
+
+    window.editServiceArea = function(id) {
+      const area = cachedServiceAreas.find(a => a.area_id === id);
+      if (area) openAreaModal(true, area);
+    };
+
+    window.toggleAreaStatus = async function(id, currentStatus) {
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      try {
+        const res = await API.put(`/api/admin/service-areas/${id}`, { status: nextStatus });
+        if (res.ok) {
+          API.toast(`Service zone status updated to ${nextStatus}`, 'success');
+          await loadServiceAreas();
+        } else {
+          API.toast(res.message || 'Failed to update zone status', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error updating zone status', 'error');
+      }
+    };
+
+    window.deleteServiceArea = async function(id, name) {
+      if (!confirm(`Are you sure you want to remove service area "${name}"?`)) return;
+      try {
+        const res = await API.delete(`/api/admin/service-areas/${id}`);
+        if (res.ok) {
+          API.toast(`Service area "${name}" removed.`, 'success');
+          await loadServiceAreas();
+        } else {
+          API.toast(res.message || 'Failed to delete service area', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error deleting service area', 'error');
+      }
+    };
+
+    areaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('serviceAreaId').value;
+      const isEdit = Boolean(id);
+
+      const payload = {
+        area_name: document.getElementById('areaName').value.trim(),
+        city: document.getElementById('areaCity').value.trim(),
+        state: document.getElementById('areaState').value.trim(),
+        status: document.getElementById('areaStatus').value
+      };
+
+      const btn = document.getElementById('btnSubmitArea');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const url = isEdit ? `/api/admin/service-areas/${id}` : '/api/admin/service-areas';
+        const res = isEdit ? await API.put(url, payload) : await API.post(url, payload);
+
+        if (res.ok) {
+          API.toast(res.message || 'Service area saved successfully!', 'success');
+          closeAreaModal();
+          await loadServiceAreas();
+        } else {
+          API.toast(res.message || 'Could not save service area', 'error');
+        }
+      } catch (err) {
+        API.toast('Network error saving service area', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Service Area';
+      }
+    });
+
+    // ── LIVE TARIFF SIMULATOR ────────────────────────────────
+    function populateSimulatorOptions() {
+      const select = document.getElementById('simVehicleType');
+      if (cachedFareRules.length === 0) return;
+
+      select.innerHTML = cachedFareRules.map(r => {
+        const meta = VEHICLE_META[r.vehicle_type] || { icon: '🚘', name: r.vehicle_type };
+        return `<option value="${r.vehicle_type}">${meta.icon} ${meta.name}</option>`;
+      }).join('');
+    }
+
+    const simType = document.getElementById('simVehicleType');
+    const simDist = document.getElementById('simDistanceSlider');
+    const simDur = document.getElementById('simDurationSlider');
+
+    function runSimulation() {
+      const type = simType.value;
+      const km = parseFloat(simDist.value);
+      const min = parseFloat(simDur.value);
+
+      document.getElementById('simDistLabel').textContent = `${km.toFixed(1)} km`;
+      document.getElementById('simDurLabel').textContent = `${min} mins`;
+
+      // Find active rule from cache or use defaults
+      const rule = cachedFareRules.find(r => r.vehicle_type === type) || {
+        base_fare: 100,
+        per_km_rate: 18,
+        per_minute_rate: 2,
+        vehicle_type: type
+      };
+
+      const base = parseFloat(rule.base_fare);
+      const kmRate = parseFloat(rule.per_km_rate);
+      const minRate = parseFloat(rule.per_minute_rate);
+
+      const distCost = km * kmRate;
+      const timeCost = min * minRate;
+      const total = base + distCost + timeCost;
+
+      const meta = VEHICLE_META[type] || { name: type, class: 'badge-sedan' };
+      const catBadge = document.getElementById('simCategoryBadge');
+      catBadge.className = `badge-vehicle ${meta.class}`;
+      catBadge.textContent = meta.name;
+
+      document.getElementById('outBaseFare').textContent = `₹${base.toFixed(2)}`;
+      document.getElementById('outDistKm').textContent = km.toFixed(1);
+      document.getElementById('outKmRate').textContent = kmRate.toFixed(2);
+      document.getElementById('outDistCost').textContent = `₹${distCost.toFixed(2)}`;
+
+      document.getElementById('outDurMins').textContent = min;
+      document.getElementById('outMinRate').textContent = minRate.toFixed(2);
+      document.getElementById('outTimeCost').textContent = `₹${timeCost.toFixed(2)}`;
+
+      document.getElementById('outTotalFare').textContent = `₹${total.toFixed(2)}`;
+    }
+
+    simType.addEventListener('change', runSimulation);
+    simDist.addEventListener('input', runSimulation);
+    simDur.addEventListener('input', runSimulation);
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadFareRules();
+      loadServiceAreas();
+    });
+  </script>
+</body>
+</html>

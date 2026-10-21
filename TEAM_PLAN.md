@@ -237,8 +237,8 @@ cab-booking/                          ← project root
 - [x] `server/utils/fareCalculator.js`: `estimatedFare = base_fare + (km × per_km_rate) + (min × per_minute_rate)`
 
 #### Commit 3 — `feat(ui): fare-rules.html (admin)`
-- [ ] Fare rules table + Add/Edit modal CRUD via Fetch, DOM-updated
-- [ ] Service areas table + same CRUD pattern
+- [x] Fare rules table + Add/Edit modal CRUD via Fetch, DOM-updated
+- [x] Service areas table + same CRUD pattern
 
 ---
 
