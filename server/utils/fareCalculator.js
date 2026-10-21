@@ -122,12 +122,14 @@ async function getRoadDistanceKm(pickup, destination) {
     return Number((distanceMeters / 1000).toFixed(1));
 }
 
-// Calculate the fare using the base fare and per-kilometre rate.
-// Formula: Fare = Base fare + (Distance × Rate per kilometre).
-function calculateFare(distanceKm, baseFare, perKmRate) {
+// Calculate the fare using base fare, per-kilometre rate, and per-minute rate.
+// Formula: estimatedFare = base_fare + (km × per_km_rate) + (min × per_minute_rate)
+function calculateFare(distanceKm, baseFare, perKmRate, durationMinutes = 0, perMinuteRate = 0) {
     const distance = Number(distanceKm);
     const base = Number(baseFare);
-    const rate = Number(perKmRate);
+    const kmRate = Number(perKmRate);
+    const duration = Number(durationMinutes || 0);
+    const minRate = Number(perMinuteRate || 0);
 
     if (!Number.isFinite(distance) || distance <= 0) {
         throw new Error('Distance must be greater than zero.');
@@ -137,19 +139,60 @@ function calculateFare(distanceKm, baseFare, perKmRate) {
         throw new Error('Base fare must be zero or greater.');
     }
 
-    if (!Number.isFinite(rate) || rate < 0) {
-        throw new Error(
-            'Per-kilometre rate must be zero or greater.'
-        );
+    if (!Number.isFinite(kmRate) || kmRate < 0) {
+        throw new Error('Per-kilometre rate must be zero or greater.');
+    }
+
+    if (!Number.isFinite(duration) || duration < 0) {
+        throw new Error('Duration minutes must be zero or greater.');
+    }
+
+    if (!Number.isFinite(minRate) || minRate < 0) {
+        throw new Error('Per-minute rate must be zero or greater.');
     }
 
     // Return the calculated fare rounded to two decimal places.
-    return Number((base + distance * rate).toFixed(2));
+    const total = base + (distance * kmRate) + (duration * minRate);
+    return Number(total.toFixed(2));
 }
 
-// Export the functions so passenger.js can use them.
+// Calculate fare directly using active rules from the database
+async function estimateTripFare(pool, vehicleType, distanceKm, durationMinutes = 0) {
+    const [rules] = await pool.execute(
+        `SELECT base_fare, per_km_rate, per_minute_rate, cancellation_fee
+         FROM fare_rules
+         WHERE vehicle_type = ? AND status = 'active'
+         LIMIT 1`,
+        [vehicleType]
+    );
+
+    if (rules.length === 0) {
+        // Fallback default rates if DB record missing
+        const defaults = {
+            sedan: { base: 100, km: 18, min: 2.0 },
+            suv: { base: 150, km: 25, min: 3.0 },
+            hatchback: { base: 80, km: 14, min: 1.5 },
+            auto: { base: 40, km: 10, min: 1.0 },
+            bike: { base: 25, km: 7, min: 0.75 }
+        };
+        const def = defaults[vehicleType] || defaults.sedan;
+        return calculateFare(distanceKm, def.base, def.km, durationMinutes, def.min);
+    }
+
+    const rule = rules[0];
+    return calculateFare(
+        distanceKm,
+        parseFloat(rule.base_fare),
+        parseFloat(rule.per_km_rate),
+        durationMinutes,
+        parseFloat(rule.per_minute_rate)
+    );
+}
+
+// Export the functions for use across passenger, driver, and admin modules
 module.exports = {
     geocodeAddress,
     getRoadDistanceKm,
-    calculateFare
+    calculateFare,
+    estimateTripFare
 };

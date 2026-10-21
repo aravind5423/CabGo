@@ -232,9 +232,9 @@ cab-booking/                          ← project root
 - [x] `GET /api/passenger/payments` — payment history
 
 #### Commit 2 — `feat(api): admin – fare rules + service areas APIs`
-- [ ] `GET/POST/PUT/DELETE /api/admin/fare-rules`
-- [ ] `GET/POST/PUT/DELETE /api/admin/service-areas`
-- [ ] `server/utils/fareCalculator.js`: `estimatedFare = base_fare + (km × per_km_rate) + (min × per_minute_rate)`
+- [x] `GET/POST/PUT/DELETE /api/admin/fare-rules`
+- [x] `GET/POST/PUT/DELETE /api/admin/service-areas`
+- [x] `server/utils/fareCalculator.js`: `estimatedFare = base_fare + (km × per_km_rate) + (min × per_minute_rate)`
 
 #### Commit 3 — `feat(ui): fare-rules.html (admin)`
 - [ ] Fare rules table + Add/Edit modal CRUD via Fetch, DOM-updated
