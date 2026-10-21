@@ -227,9 +227,9 @@ cab-booking/                          ← project root
 **Goal**: Payment recording; admin fare rule and service area management
 
 #### Commit 1 — `feat(api): payments module`
-- [ ] `POST /api/payments` — record payment (auto-trigger on trip complete)
-- [ ] `GET /api/payments/trip/:trip_id`
-- [ ] `GET /api/passenger/payments` — payment history
+- [x] `POST /api/payments` — record payment (auto-trigger on trip complete)
+- [x] `GET /api/payments/trip/:trip_id`
+- [x] `GET /api/passenger/payments` — payment history
 
 #### Commit 2 — `feat(api): admin – fare rules + service areas APIs`
 - [ ] `GET/POST/PUT/DELETE /api/admin/fare-rules`
