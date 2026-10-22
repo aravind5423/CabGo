@@ -246,11 +246,11 @@ cab-booking/                          ← project root
 **Goal**: Admin can manage all passengers, drivers, vehicles, and trips
 
 #### Commit 1 — `feat(api): admin – users & vehicles management APIs`
-- [ ] `GET /api/admin/passengers` (paginated)
-- [ ] `GET /api/admin/drivers`
-- [ ] `PUT /api/admin/drivers/:id/approve|reject|block|unblock`
-- [ ] `PUT /api/admin/passengers/:id/block|unblock`
-- [ ] `GET /api/admin/vehicles` + `PUT /api/admin/vehicles/:id/status`
+- [x] `GET /api/admin/passengers` (paginated)
+- [x] `GET /api/admin/drivers`
+- [x] `PUT /api/admin/drivers/:id/approve|reject|block|unblock`
+- [x] `PUT /api/admin/passengers/:id/block|unblock`
+- [x] `GET /api/admin/vehicles` + `PUT /api/admin/vehicles/:id/status`
 
 #### Commit 2 — `feat(ui): admin-dashboard.html + manage-passengers/drivers.html`
 - [ ] Dashboard: KPI cards, activity feed, vanilla Canvas charts
