@@ -5,81 +5,83 @@
 /* ── CSS Custom Properties ───────────────────────────────── */
 :root {
   /* Canvas & Containers (Soft organic sage/olive canvas with porcelain pods) */
-  --bg-canvas:         #C2C8B8;
-  --bg-canvas-subtle:  #B8BFAD;
-  --bg-card:           #FFFFFF;
-  --bg-card-subtle:    #F6F7F3;
-  --bg-dark:           #111315;
-  --bg-dark-surface:   #1A1C20;
-  
+  --bg-canvas: #C2C8B8;
+  --bg-canvas-subtle: #B8BFAD;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F6F7F3;
+  --bg-dark: #111315;
+  --bg-dark-surface: #1A1C20;
+
   /* Electric Neon Lime / Chartreuse Accent */
-  --accent-lime:        #D4F038;
-  --accent-lime-hover:  #C4E22A;
-  --accent-lime-glow:   rgba(212, 240, 56, 0.4);
+  --accent-lime: #D4F038;
+  --accent-lime-hover: #C4E22A;
+  --accent-lime-glow: rgba(212, 240, 56, 0.4);
   --accent-lime-subtle: rgba(212, 240, 56, 0.15);
-  
+
   /* Brand Tokens (Compatible with existing pages) */
-  --primary:            #111315;
-  --primary-dark:       #000000;
-  --primary-light:      #2A2E35;
-  --primary-glow:       rgba(0, 0, 0, 0.2);
-  --accent:             #D4F038;
-  --accent-dark:        #C4E22A;
-  --accent-light:       #E2FA58;
-  --accent-glow:        rgba(212, 240, 56, 0.35);
+  --primary: #111315;
+  --primary-dark: #000000;
+  --primary-light: #2A2E35;
+  --primary-glow: rgba(0, 0, 0, 0.2);
+  --accent: #D4F038;
+  --accent-dark: #C4E22A;
+  --accent-light: #E2FA58;
+  --accent-glow: rgba(212, 240, 56, 0.35);
 
   /* Surface & Borders */
-  --surface:            #FFFFFF;
-  --surface-2:          #F6F7F3;
-  --surface-3:          #E8EBE1;
-  --border:             rgba(0, 0, 0, 0.08);
-  --border-light:       rgba(0, 0, 0, 0.05);
-  --border-pill:        rgba(0, 0, 0, 0.14);
+  --surface: #FFFFFF;
+  --surface-2: #F6F7F3;
+  --surface-3: #E8EBE1;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.05);
+  --border-pill: rgba(0, 0, 0, 0.14);
 
   /* Text Colors */
-  --text:               #111315;
-  --text-dark:          #111315;
-  --text-muted:         #656D76;
-  --text-subtle:        #8C95A0;
-  --text-light:         #FFFFFF;
+  --text: #111315;
+  --text-dark: #111315;
+  --text-muted: #656D76;
+  --text-subtle: #8C95A0;
+  --text-light: #FFFFFF;
 
   /* Status Colors */
-  --success:            #10B981;
-  --success-light:      rgba(16, 185, 129, 0.15);
-  --error:              #EF4444;
-  --error-light:        rgba(239, 68, 68, 0.15);
-  --warning:            #F59E0B;
-  --warning-light:      rgba(245, 158, 11, 0.15);
-  --info:               #3B82F6;
-  --info-light:         rgba(59, 130, 246, 0.15);
+  --success: #10B981;
+  --success-light: rgba(16, 185, 129, 0.15);
+  --error: #EF4444;
+  --error-light: rgba(239, 68, 68, 0.15);
+  --warning: #F59E0B;
+  --warning-light: rgba(245, 158, 11, 0.15);
+  --info: #3B82F6;
+  --info-light: rgba(59, 130, 246, 0.15);
 
   /* Typography */
-  --font-ui:            'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-heading:       'Outfit', 'Plus Jakarta Sans', sans-serif;
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 
   /* Sizing & Radiuses (Organic generous curves) */
-  --radius-xs:          6px;
-  --radius-sm:          10px;
-  --radius:             16px;
-  --radius-lg:          22px;
-  --radius-xl:          32px;
-  --radius-2xl:         42px;
-  --radius-pill:        9999px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-2xl: 42px;
+  --radius-pill: 9999px;
 
   /* Shadows */
-  --shadow-xs:          0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-sm:          0 4px 12px rgba(0, 0, 0, 0.05);
-  --shadow:             0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-lg:          0 16px 40px rgba(0, 0, 0, 0.08);
-  --shadow-lime:        0 8px 24px rgba(212, 240, 56, 0.35);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.08);
+  --shadow-lime: 0 8px 24px rgba(212, 240, 56, 0.35);
 
   /* Transitions */
-  --t:                  0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  --t-slow:             0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  --t: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --t-slow: 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Reset & Base ────────────────────────────────────────── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -100,7 +102,9 @@ body {
   min-height: 100vh;
 }
 
-img, svg, video {
+img,
+svg,
+video {
   display: block;
   max-width: 100%;
 }
@@ -118,7 +122,9 @@ button {
   font-family: var(--font-ui);
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: var(--font-ui);
 }
 
@@ -127,19 +133,47 @@ ul {
 }
 
 /* ── Typography ──────────────────────────────────────────── */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   line-height: 1.15;
   color: var(--text-dark);
   letter-spacing: -0.02em;
 }
 
-h1 { font-size: clamp(2.4rem, 5vw, 3.8rem); font-weight: 800; }
-h2 { font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 700; }
-h3 { font-size: 1.35rem; font-weight: 700; }
-h4 { font-size: 1.1rem; font-weight: 600; }
-p  { color: var(--text-muted); line-height: 1.65; }
-small { font-size: 0.85rem; color: var(--text-subtle); }
+h1 {
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 800;
+}
+
+h2 {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+p {
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+small {
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+}
 
 /* ── Layout Outer Wrapper ────────────────────────────────── */
 .app-frame {
@@ -206,7 +240,8 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
 }
 
 /* The Signature Lime Pill Button (Get Started ↗) */
-.btn-lime, .btn-primary {
+.btn-lime,
+.btn-primary {
   background-color: var(--accent-lime);
   color: #111315;
   font-weight: 700;
@@ -214,7 +249,8 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
   box-shadow: 0 4px 16px rgba(212, 240, 56, 0.35);
 }
 
-.btn-lime:hover, .btn-primary:hover {
+.btn-lime:hover,
+.btn-primary:hover {
   background-color: var(--accent-lime-hover);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(212, 240, 56, 0.45);
@@ -265,11 +301,22 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
   background: rgba(0, 0, 0, 0.04);
 }
 
-.btn-sm { padding: 0.4rem 1rem; font-size: 0.82rem; }
-.btn-lg { padding: 0.85rem 2.2rem; font-size: 1rem; }
-.btn-block { width: 100%; }
+.btn-sm {
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+}
 
-.btn:disabled, .btn[disabled] {
+.btn-lg {
+  padding: 0.85rem 2.2rem;
+  font-size: 1rem;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn:disabled,
+.btn[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
@@ -313,8 +360,13 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
 }
 
 @keyframes spinText {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .spin-badge-center {
@@ -383,11 +435,35 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
   text-transform: capitalize;
 }
 
-.status-pending { background: #FEF3C7; color: #D97706; border: 1px solid #FCD34D; }
-.status-accepted { background: #DBEAFE; color: #2563EB; border: 1px solid #93C5FD; }
-.status-in_progress { background: #EDE9FE; color: #7C3AED; border: 1px solid #C4B5FD; }
-.status-completed { background: #D1FAE5; color: #059669; border: 1px solid #6EE7B7; }
-.status-cancelled { background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5; }
+.status-pending {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FCD34D;
+}
+
+.status-accepted {
+  background: #DBEAFE;
+  color: #2563EB;
+  border: 1px solid #93C5FD;
+}
+
+.status-in_progress {
+  background: #EDE9FE;
+  color: #7C3AED;
+  border: 1px solid #C4B5FD;
+}
+
+.status-completed {
+  background: #D1FAE5;
+  color: #059669;
+  border: 1px solid #6EE7B7;
+}
+
+.status-cancelled {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FCA5A5;
+}
 
 /* ── Toast Notifications ─────────────────────────────────── */
 #toast-container {
@@ -416,13 +492,34 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
   gap: 0.65rem;
 }
 
-.toast-success { background: #111315; color: #fff; border-left: 4px solid var(--accent-lime); }
-.toast-error   { background: #111315; color: #fff; border-left: 4px solid #EF4444; }
-.toast-info    { background: #111315; color: #fff; border-left: 4px solid #3B82F6; }
+.toast-success {
+  background: #111315;
+  color: #fff;
+  border-left: 4px solid var(--accent-lime);
+}
+
+.toast-error {
+  background: #111315;
+  color: #fff;
+  border-left: 4px solid #EF4444;
+}
+
+.toast-info {
+  background: #111315;
+  color: #fff;
+  border-left: 4px solid #3B82F6;
+}
 
 @keyframes toastIn {
-  from { transform: translateY(20px) scale(0.95); opacity: 0; }
-  to   { transform: translateY(0) scale(1); opacity: 1; }
+  from {
+    transform: translateY(20px) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 /* ── Navigation Shell ────────────────────────────────────── */
@@ -479,7 +576,47 @@ small { font-size: 0.85rem; color: var(--text-subtle); }
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 992px) {
-  .app-frame { padding: 1rem; }
-  .card-pod { padding: 1.75rem; }
-  .nav-links { display: none; }
+  .app-frame {
+    padding: 1rem;
+  }
+
+  .card-pod {
+    padding: 1.75rem;
+  }
+
+  .nav-links {
+    display: none;
+  }
+}
+
+/* ── Feature Cards Hover Text Fix ───────────────────────── */
+
+.feature-card {
+  transition: background-color 0.25s ease,
+    color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.feature-card:hover {
+  background-color: var(--accent-lime);
+  color: #111315;
+  transform: translateY(-5px);
+}
+
+/* Headings */
+.feature-card:hover h1,
+.feature-card:hover h2,
+.feature-card:hover h3,
+.feature-card:hover h4,
+.feature-card:hover h5,
+.feature-card:hover h6 {
+  color: #111315;
+}
+
+/* Paragraphs and other text */
+.feature-card:hover p,
+.feature-card:hover span,
+.feature-card:hover a,
+.feature-card:hover li {
+  color: #111315;
 }
