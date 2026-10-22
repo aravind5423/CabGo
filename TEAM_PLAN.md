@@ -253,9 +253,9 @@ cab-booking/                          ← project root
 - [x] `GET /api/admin/vehicles` + `PUT /api/admin/vehicles/:id/status`
 
 #### Commit 2 — `feat(ui): admin-dashboard.html + manage-passengers/drivers.html`
-- [ ] Dashboard: KPI cards, activity feed, vanilla Canvas charts
-- [ ] Manage passengers: search + paginate + block/unblock (DOM update)
-- [ ] Manage drivers: approve/reject/block with confirmation modal
+- [x] Dashboard: KPI cards, activity feed, vanilla Canvas charts
+- [x] Manage passengers: search + paginate + block/unblock (DOM update)
+- [x] Manage drivers: approve/reject/block with confirmation modal
 
 #### Commit 3 — `feat(ui): manage-vehicles.html + manage-trips.html (admin)`
 - [ ] Vehicles: all vehicles table, activate/deactivate
