@@ -258,8 +258,8 @@ cab-booking/                          ← project root
 - [x] Manage drivers: approve/reject/block with confirmation modal
 
 #### Commit 3 — `feat(ui): manage-vehicles.html + manage-trips.html (admin)`
-- [ ] Vehicles: all vehicles table, activate/deactivate
-- [ ] Trips: filter by status, admin mark-complete
+- [x] Vehicles: all vehicles table, activate/deactivate
+- [x] Trips: filter by status, admin mark-complete
 
 ---
 

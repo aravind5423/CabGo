@@ -1,1 +1,258 @@
-<!-- TODO: manage trips -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Trips & Dispatches — CabGo Operations</title>
+  <meta name="description" content="Real-time ride tracking, trip lifecycle management, itinerary inspection, and operational force-completion controls." />
+  
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <script src="/js/router-guard.js" data-role="admin,superadmin"></script>
+
+  <style>
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #D97706;
+      box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7);
+      animation: pulse 1.6s infinite;
+      margin-right: 4px;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+      }
+    }
+    .date-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #F6F7F3;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-pill, 9999px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .date-filter-group input[type="date"] {
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: var(--text-dark);
+      outline: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Pill Navbar -->
+  <nav class="dash-navbar" aria-label="Admin Navigation">
+    <a href="/admin/dashboard.html" class="dash-brand">
+      <div class="dash-brand-icon">🚖</div>
+      <span>CabGo <span style="font-weight:400; font-size:0.85em; opacity:0.6;">Admin</span></span>
+    </a>
+
+    <ul class="dash-nav-links">
+      <li><a href="/admin/dashboard.html" class="dash-nav-link">📊 Overview</a></li>
+      <li><a href="/admin/manage-passengers.html" class="dash-nav-link">👥 Passengers</a></li>
+      <li><a href="/admin/manage-drivers.html" class="dash-nav-link">🚘 Drivers</a></li>
+      <li><a href="/admin/manage-vehicles.html" class="dash-nav-link">🚙 Fleet</a></li>
+      <li><a href="/admin/manage-trips.html" class="dash-nav-link active">🗺️ Trips</a></li>
+      <li><a href="/admin/fare-rules.html" class="dash-nav-link">⚡ Fare & Areas</a></li>
+      <li><a href="/admin/reports.html" class="dash-nav-link">📈 Reports</a></li>
+    </ul>
+
+    <div class="dash-user-menu">
+      <div style="text-align:right;">
+        <div data-user-name style="font-size:0.85rem; font-weight:800; color:var(--text-dark);">Admin</div>
+        <div data-user-role style="font-size:0.75rem; color:var(--text-muted);">Operations</div>
+      </div>
+      <button id="logoutBtn" class="action-btn" style="border-radius:var(--radius-pill); padding:0.45rem 0.9rem;">
+        🚪 Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    <div class="app-container">
+
+      <!-- Header Row -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem; padding-top:0.75rem;">
+        <div>
+          <h1 style="font-family:var(--font-heading); font-size:2.2rem; font-weight:900; color:var(--text-dark); letter-spacing:-0.03em;">
+            Trip Monitoring & Dispatches
+          </h1>
+          <p style="color:var(--text-muted); font-size:0.95rem; margin-top:0.3rem;">
+            Real-time urban ride telemetry, route tracking, payment settlement verification, and manual completion overrides.
+          </p>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <section class="kpi-grid" aria-label="Trip Metrics">
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Total Trips</span>
+            <span>🗺️</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalTrips">—</div>
+          <div class="kpi-sub">All platform journeys</div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #D97706;">
+          <div class="kpi-title">
+            <span>In Progress</span>
+            <span>🚖</span>
+          </div>
+          <div class="kpi-value" id="kpiActiveTrips" style="color:#D97706;">—</div>
+          <div class="kpi-sub">Vehicles en route with riders</div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #059669;">
+          <div class="kpi-title">
+            <span>Completed</span>
+            <span>🏁</span>
+          </div>
+          <div class="kpi-value" id="kpiCompletedTrips" style="color:#059669;">—</div>
+          <div class="kpi-sub">Successfully fulfilled</div>
+        </div>
+
+        <div class="kpi-card" style="background:#111315; color:#FFFFFF;">
+          <div class="kpi-title" style="color:rgba(255,255,255,0.7);">
+            <span style="color:var(--accent-lime);">Total Revenue</span>
+            <span>💰</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalRevenue" style="color:#FFFFFF;">₹0.00</div>
+          <div class="kpi-sub" style="color:rgba(255,255,255,0.6);">Fares collected from rides</div>
+        </div>
+      </section>
+
+      <!-- Main Panel -->
+      <div class="panel-card">
+
+        <!-- Search and Filters Bar -->
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="tripSearch" placeholder="Search by route, passenger, driver, or vehicle plate..." />
+          </div>
+
+          <select id="tripStatusFilter" class="filter-select">
+            <option value="">All Statuses</option>
+            <option value="in_progress">In Progress</option>
+            <option value="accepted">Accepted</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <div class="date-filter-group">
+            <span>From:</span>
+            <input type="date" id="tripFromDate" />
+          </div>
+
+          <div class="date-filter-group">
+            <span>To:</span>
+            <input type="date" id="tripToDate" />
+          </div>
+
+          <button id="btnResetTripFilters" class="action-btn" title="Reset all filters">
+            ↺ Reset
+          </button>
+        </div>
+
+        <!-- Trips Table -->
+        <div class="table-responsive">
+          <table class="data-table" id="tripsTable">
+            <thead>
+              <tr>
+                <th>Trip ID</th>
+                <th>Route (Pickup & Drop)</th>
+                <th>Passenger</th>
+                <th>Driver & Vehicle</th>
+                <th>Distance & Fare</th>
+                <th>Payment</th>
+                <th>Trip Status</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tripsTbody">
+              <tr>
+                <td colspan="8" style="text-align:center; padding:2.5rem; color:var(--text-muted);">
+                  Loading trip dispatch history...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Complete Trip Confirmation Modal -->
+  <div id="completeTripModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalCompleteTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalCompleteTitle">🏁 Force Complete Trip</h2>
+        <button class="modal-close" id="btnCloseCompleteModal" aria-label="Close modal">✕</button>
+      </div>
+
+      <div style="font-size:0.95rem; color:var(--text-dark); line-height:1.5; margin-bottom:1.5rem;" id="modalCompleteMsg">
+        Are you sure you want to manually mark this trip as completed?
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnCancelCompleteModal" class="btn-secondary">Cancel</button>
+        <button id="btnConfirmCompleteTrip" class="btn-primary">Complete Trip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trip Details Modal -->
+  <div id="tripDetailsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalDetailsTripTitle">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalDetailsTripTitle">Trip Itinerary Details</h2>
+        <button class="modal-close" id="btnCloseDetailsTripModal" aria-label="Close modal">✕</button>
+      </div>
+
+      <div id="tripDetailsContent" style="font-size:0.9rem; line-height:1.6;">
+        <!-- Populated via JS -->
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnCloseDetailsTripBtn" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/admin/manage-trips.js"></script>
+  <script>
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+      sessionStorage.clear();
+      window.location.replace('/login.html');
+    });
+  </script>
+</body>
+</html>

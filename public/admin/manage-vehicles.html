@@ -1,1 +1,377 @@
-<!-- TODO: manage vehicles -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Fleet Vehicles — CabGo Operations</title>
+  <meta name="description" content="Oversee the urban transit fleet, monitor vehicle roadworthiness, categories, and operational status." />
+  
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <script src="/js/router-guard.js" data-role="admin,superadmin"></script>
+</head>
+<body>
+
+  <!-- Floating Pill Navbar -->
+  <nav class="dash-navbar" aria-label="Admin Navigation">
+    <a href="/admin/dashboard.html" class="dash-brand">
+      <div class="dash-brand-icon">🚖</div>
+      <span>CabGo <span style="font-weight:400; font-size:0.85em; opacity:0.6;">Admin</span></span>
+    </a>
+
+    <ul class="dash-nav-links">
+      <li><a href="/admin/dashboard.html" class="dash-nav-link">📊 Overview</a></li>
+      <li><a href="/admin/manage-passengers.html" class="dash-nav-link">👥 Passengers</a></li>
+      <li><a href="/admin/manage-drivers.html" class="dash-nav-link">🚘 Drivers</a></li>
+      <li><a href="/admin/manage-vehicles.html" class="dash-nav-link active">🚙 Fleet</a></li>
+      <li><a href="/admin/manage-trips.html" class="dash-nav-link">🗺️ Trips</a></li>
+      <li><a href="/admin/fare-rules.html" class="dash-nav-link">⚡ Fare & Areas</a></li>
+      <li><a href="/admin/reports.html" class="dash-nav-link">📈 Reports</a></li>
+    </ul>
+
+    <div class="dash-user-menu">
+      <div style="text-align:right;">
+        <div data-user-name style="font-size:0.85rem; font-weight:800; color:var(--text-dark);">Admin</div>
+        <div data-user-role style="font-size:0.75rem; color:var(--text-muted);">Operations</div>
+      </div>
+      <button id="logoutBtn" class="action-btn" style="border-radius:var(--radius-pill); padding:0.45rem 0.9rem;">
+        🚪 Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    <div class="app-container">
+
+      <!-- Header Row -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:1.75rem; padding-top:0.75rem;">
+        <div>
+          <h1 style="font-family:var(--font-heading); font-size:2.2rem; font-weight:900; color:var(--text-dark); letter-spacing:-0.03em;">
+            Fleet Vehicle Inventory
+          </h1>
+          <p style="color:var(--text-muted); font-size:0.95rem; margin-top:0.3rem;">
+            Inspect urban vehicles, classification tiers, driver assignments, and toggle road deployment availability.
+          </p>
+        </div>
+      </div>
+
+      <!-- Fleet Metrics KPI Grid -->
+      <section class="kpi-grid" aria-label="Fleet Metrics">
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Total Fleet</span>
+            <span>🚙</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalVehicles">—</div>
+          <div class="kpi-sub">All registered vehicles</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Active & Deployed</span>
+            <span>🟢</span>
+          </div>
+          <div class="kpi-value" id="kpiActiveVehicles" style="color:#059669;">—</div>
+          <div class="kpi-sub">Authorized for passenger trips</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Inactive / Maintenance</span>
+            <span>🛑</span>
+          </div>
+          <div class="kpi-value" id="kpiInactiveVehicles" style="color:#64748B;">—</div>
+          <div class="kpi-sub">Temporarily offline</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Sedans & SUVs</span>
+            <span>🚗</span>
+          </div>
+          <div class="kpi-value" id="kpiSedanSuv">—</div>
+          <div class="kpi-sub" id="kpiSedanSuvSub">Premium tier cabs</div>
+        </div>
+      </section>
+
+      <!-- Main Data Panel -->
+      <div class="panel-card">
+
+        <!-- Search and Filters Bar -->
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="vehicleSearch" placeholder="Search by vehicle number, model, or driver partner..." />
+          </div>
+
+          <select id="vehicleTypeFilter" class="filter-select">
+            <option value="">All Categories</option>
+            <option value="sedan">Sedan</option>
+            <option value="suv">SUV</option>
+            <option value="hatchback">Hatchback</option>
+            <option value="auto">Auto</option>
+            <option value="bike">Bike</option>
+          </select>
+
+          <select id="vehicleStatusFilter" class="filter-select">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          <button id="btnResetVehicleFilters" class="action-btn" title="Reset search filters">
+            ↺ Reset
+          </button>
+        </div>
+
+        <!-- Vehicles Table -->
+        <div class="table-responsive">
+          <table class="data-table" id="vehiclesTable">
+            <thead>
+              <tr>
+                <th>Vehicle Number</th>
+                <th>Category</th>
+                <th>Make & Model</th>
+                <th>Capacity</th>
+                <th>Assigned Captain</th>
+                <th>Lifetime Trips</th>
+                <th>Status</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="vehiclesTbody">
+              <tr>
+                <td colspan="8" style="text-align:center; padding:2.5rem; color:var(--text-muted);">
+                  Loading fleet registry...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Toggle Status Confirmation Modal -->
+  <div id="vehicleStatusModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalVehicleTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalVehicleTitle">Change Vehicle Status</h2>
+        <button class="modal-close" id="btnCloseVehicleModal" aria-label="Close modal">✕</button>
+      </div>
+
+      <div style="font-size:0.95rem; color:var(--text-dark); line-height:1.5; margin-bottom:1.5rem;" id="modalVehicleMsg">
+        Are you sure?
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnCancelVehicleModal" class="btn-secondary">Cancel</button>
+        <button id="btnConfirmVehicleStatus" class="btn-primary">Update Status</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    'use strict';
+
+    let fleetData = [];
+    let pendingVehicle = { id: null, number: '', nextStatus: '' };
+
+    const tbody = document.getElementById('vehiclesTbody');
+    const searchInput = document.getElementById('vehicleSearch');
+    const typeSelect = document.getElementById('vehicleTypeFilter');
+    const statusSelect = document.getElementById('vehicleStatusFilter');
+    const resetBtn = document.getElementById('btnResetVehicleFilters');
+
+    const modal = document.getElementById('vehicleStatusModal');
+    const modalTitle = document.getElementById('modalVehicleTitle');
+    const modalMsg = document.getElementById('modalVehicleMsg');
+    const btnCloseModal = document.getElementById('btnCloseVehicleModal');
+    const btnCancelModal = document.getElementById('btnCancelVehicleModal');
+    const btnConfirmStatus = document.getElementById('btnConfirmVehicleStatus');
+
+    document.addEventListener('DOMContentLoaded', loadVehicles);
+
+    function openStatusModal(id, number, currentStatus) {
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      pendingVehicle = { id, number, nextStatus };
+
+      modalTitle.textContent = nextStatus === 'active' ? '🟢 Activate Vehicle' : '🛑 Deactivate Vehicle';
+      modalMsg.innerHTML = nextStatus === 'active'
+        ? `Deploy vehicle <strong>${escapeHtml(number)}</strong> back into active service?<br><span style="font-size:0.85rem; color:var(--text-muted);">The driver will be eligible to accept rides with this cab.</span>`
+        : `Take vehicle <strong>${escapeHtml(number)}</strong> offline for maintenance?<br><span style="font-size:0.85rem; color:var(--text-muted);">It will not be available for new dispatches.</span>`;
+
+      btnConfirmStatus.className = nextStatus === 'active' ? 'btn-accent' : 'btn-danger';
+      btnConfirmStatus.textContent = nextStatus === 'active' ? 'Activate Vehicle' : 'Deactivate Vehicle';
+      modal.classList.add('active');
+    }
+
+    function closeModal() {
+      modal.classList.remove('active');
+      pendingVehicle = { id: null, number: '', nextStatus: '' };
+    }
+
+    btnCloseModal?.addEventListener('click', closeModal);
+    btnCancelModal?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    btnConfirmStatus?.addEventListener('click', async () => {
+      if (!pendingVehicle.id) return;
+      btnConfirmStatus.disabled = true;
+      btnConfirmStatus.textContent = 'Updating...';
+
+      try {
+        const res = await API.put(`/api/admin/vehicles/${pendingVehicle.id}/status`, {
+          status: pendingVehicle.nextStatus
+        });
+
+        if (res.ok && res.success) {
+          showToast(res.message || 'Vehicle status updated successfully.', 'success');
+          closeModal();
+          loadVehicles();
+        } else {
+          showToast(res.message || 'Failed to update vehicle.', 'error');
+        }
+      } catch (err) {
+        showToast(err.message || 'Network error.', 'error');
+      } finally {
+        btnConfirmStatus.disabled = false;
+      }
+    });
+
+    async function loadVehicles() {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">Loading fleet vehicles...</td></tr>';
+
+      try {
+        const qs = new URLSearchParams({
+          search: searchInput.value.trim(),
+          type: typeSelect.value,
+          status: statusSelect.value
+        }).toString();
+
+        const res = await API.get(`/api/admin/vehicles?${qs}`);
+        if (!res.ok || !res.success) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:#DC2626;">${res.message || 'Failed to load vehicles.'}</td></tr>`;
+          return;
+        }
+
+        fleetData = res.vehicles || [];
+
+        // KPI Update
+        if (res.summary) {
+          document.getElementById('kpiTotalVehicles').textContent = res.summary.total || 0;
+          document.getElementById('kpiActiveVehicles').textContent = res.summary.active || 0;
+          document.getElementById('kpiInactiveVehicles').textContent = res.summary.inactive || 0;
+
+          const sedans = res.summary.by_type?.sedan || 0;
+          const suvs = res.summary.by_type?.suv || 0;
+          document.getElementById('kpiSedanSuv').textContent = `${sedans + suvs}`;
+          document.getElementById('kpiSedanSuvSub').textContent = `${sedans} Sedans · ${suvs} SUVs`;
+        }
+
+        renderVehicles(fleetData);
+
+      } catch (err) {
+        console.error('[manage-vehicles]', err);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem; color:#DC2626;">Network error. Please try again.</td></tr>';
+      }
+    }
+
+    function renderVehicles(vehicles) {
+      if (vehicles.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2.5rem; color:var(--text-muted);">No vehicles match the selected filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = vehicles.map(v => {
+        const statusClass = v.status === 'active' ? 'active' : 'inactive';
+        const toggleBtnText = v.status === 'active' ? '🛑 Deactivate' : '🟢 Activate';
+        const toggleBtnClass = v.status === 'active' ? 'btn-reject' : 'btn-unblock';
+
+        return `
+          <tr id="row-veh-${v.vehicle_id}">
+            <td>
+              <div style="font-weight:800; font-family:monospace; font-size:0.95rem; color:var(--text-dark);">
+                ${escapeHtml(v.vehicle_number)}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Vehicle ID: #${v.vehicle_id}</div>
+            </td>
+            <td>
+              <span class="badge-vehicle badge-${v.vehicle_type}">${v.vehicle_type}</span>
+            </td>
+            <td>
+              <div style="font-weight:700; color:var(--text-dark);">${escapeHtml(v.model)}</div>
+            </td>
+            <td style="font-weight:600;">
+              ${v.capacity} seats
+            </td>
+            <td>
+              <div style="font-weight:700;">${escapeHtml(v.driver.name)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">📱 ${escapeHtml(v.driver.mobile)}</div>
+            </td>
+            <td style="font-weight:700; color:var(--text-dark);">
+              ${v.total_trips} trips
+            </td>
+            <td>
+              <span class="status-pill ${statusClass}">${v.status}</span>
+            </td>
+            <td style="text-align:right;">
+              <button class="action-btn ${toggleBtnClass}" data-id="${v.vehicle_id}" data-num="${escapeHtml(v.vehicle_number)}" data-status="${v.status}">
+                ${toggleBtnText}
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('button[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.getAttribute('data-id'), 10);
+          const num = btn.getAttribute('data-num');
+          const status = btn.getAttribute('data-status');
+          openStatusModal(id, num, status);
+        });
+      });
+    }
+
+    // Debounced search
+    let debounceTimer;
+    searchInput?.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadVehicles, 300);
+    });
+
+    typeSelect?.addEventListener('change', loadVehicles);
+    statusSelect?.addEventListener('change', loadVehicles);
+
+    resetBtn?.addEventListener('click', () => {
+      searchInput.value = '';
+      typeSelect.value = '';
+      statusSelect.value = '';
+      loadVehicles();
+    });
+
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+      sessionStorage.clear();
+      window.location.replace('/login.html');
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
