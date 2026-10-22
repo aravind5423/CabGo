@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Search Rides — CabGo</title>
-  <meta name="description" content="Search for available cab rides on CabGo. Compare vehicle types and upfront fare estimates." />
+  <meta name="description"
+    content="Search for available cab rides on CabGo. Compare vehicle types and upfront fare estimates." />
   <link rel="stylesheet" href="/css/global.css" />
   <style>
     .search-hero-card {
@@ -38,8 +40,14 @@
       border-radius: 50%;
       pointer-events: none;
     }
-    .dot-pickup { background: #10B981; }
-    .dot-drop   { background: #EF4444; }
+
+    .dot-pickup {
+      background: #10B981;
+    }
+
+    .dot-drop {
+      background: #EF4444;
+    }
 
     .search-location-input .form-control {
       padding-left: 2.75rem;
@@ -154,15 +162,22 @@
     }
 
     @media (max-width: 800px) {
-      .search-inputs { grid-template-columns: 1fr; }
-      .book-cta-banner { flex-direction: column; align-items: flex-start; }
+      .search-inputs {
+        grid-template-columns: 1fr;
+      }
+
+      .book-cta-banner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <div class="app-frame">
-    
+
     <!-- Top Pill Navbar -->
     <header class="nav-pill-bar">
       <a href="/" class="nav-brand">
@@ -170,14 +185,12 @@
         <span>CabGo</span>
       </a>
 
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Main navigation">
         <a href="/">Home</a>
-        <a href="/search-ride.html" style="font-weight: 800;">Rides</a>
-        <a href="/login.html">Login</a>
-        <a href="/register.html">Sign Up</a>
+        <a href="/search-ride.html" class="active" aria-current="page">Rides</a>
       </nav>
 
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <div class="nav-actions">
         <a href="/login.html" class="btn btn-outline btn-sm">Log in</a>
         <a href="/register.html" class="btn btn-lime btn-sm">Sign Up ↗</a>
       </div>
@@ -194,7 +207,8 @@
           <label>📍 Pickup Location</label>
           <div class="search-location-input">
             <div class="search-location-dot dot-pickup"></div>
-            <input type="text" id="pickup" class="form-control" placeholder="Enter pickup address" value="Central Railway Station" />
+            <input type="text" id="pickup" class="form-control" placeholder="Enter pickup address"
+              value="Central Railway Station" />
           </div>
         </div>
 
@@ -202,7 +216,8 @@
           <label>🎯 Destination</label>
           <div class="search-location-input">
             <div class="search-location-dot dot-drop"></div>
-            <input type="text" id="destination" class="form-control" placeholder="Where do you want to go?" value="International Airport T2" />
+            <input type="text" id="destination" class="form-control" placeholder="Where do you want to go?"
+              value="International Airport T2" />
           </div>
         </div>
 
@@ -246,8 +261,10 @@
       <!-- Book CTA Banner -->
       <div class="book-cta-banner" id="book-cta" style="display: none;">
         <div>
-          <h3 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 0.25rem;" id="cta-title">Ready to book this cab?</h3>
-          <p style="color: rgba(17, 19, 21, 0.8); font-size: 0.92rem;" id="cta-subtitle">Log in to book instantly or create a free passenger account.</p>
+          <h3 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 0.25rem;" id="cta-title">Ready to book this
+            cab?</h3>
+          <p style="color: rgba(17, 19, 21, 0.8); font-size: 0.92rem;" id="cta-subtitle">Log in to book instantly or
+            create a free passenger account.</p>
         </div>
         <div style="display: flex; gap: 0.75rem;">
           <a href="/login.html" class="btn btn-dark">Log In to Book</a>
@@ -267,19 +284,19 @@
   <script src="/js/api.js"></script>
   <script>
     const VEHICLE_ICONS = {
-      sedan:     '🚗',
-      suv:       '🚙',
+      sedan: '🚗',
+      suv: '🚙',
       hatchback: '🚕',
-      auto:      '🛺',
-      bike:      '🏍️',
+      auto: '🛺',
+      bike: '🏍️',
     };
 
     const VEHICLE_NAMES = {
-      sedan:     'Comfort Sedan (4 Seats)',
-      suv:       'Spacious SUV (6 Seats)',
+      sedan: 'Comfort Sedan (4 Seats)',
+      suv: 'Spacious SUV (6 Seats)',
       hatchback: 'Economy Hatchback (4 Seats)',
-      auto:      'Auto Rickshaw (3 Seats)',
-      bike:      'Moto Bike (1 Seat)',
+      auto: 'Auto Rickshaw (3 Seats)',
+      bike: 'Moto Bike (1 Seat)',
     };
 
     let selectedVehicle = null;
@@ -287,7 +304,7 @@
 
     async function searchRides() {
       const pickup = document.getElementById('pickup').value.trim();
-      const dest   = document.getElementById('destination').value.trim();
+      const dest = document.getElementById('destination').value.trim();
 
       if (!pickup || !dest) {
         API.toast('Please enter both pickup and destination locations', 'error');
@@ -356,7 +373,7 @@
       const opt = lastResults?.fareOptions.find(o => o.vehicle_type === selectedVehicle);
 
       title.textContent = `Book a ${selectedVehicle.toUpperCase()} — ₹${parseFloat(opt?.estimated_fare || 0).toFixed(2)}`;
-      sub.textContent   = `From ${lastResults?.pickup} to ${lastResults?.destination}`;
+      sub.textContent = `From ${lastResults?.pickup} to ${lastResults?.destination}`;
       cta.style.display = 'flex';
     }
 
@@ -369,7 +386,7 @@
 
     function showError(title, msg) {
       document.getElementById('error-title').textContent = title;
-      document.getElementById('error-msg').textContent   = msg;
+      document.getElementById('error-msg').textContent = msg;
       showState('error');
     }
 
@@ -381,4 +398,5 @@
     });
   </script>
 </body>
+
 </html>
