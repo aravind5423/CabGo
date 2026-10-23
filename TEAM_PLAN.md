@@ -267,10 +267,10 @@ cab-booking/                          ← project root
 **Goal**: Admin reports with live charts; Super Admin user management
 
 #### Commit 1 — `feat(api): reports + system logs APIs`
-- [ ] `GET /api/admin/reports/revenue?from=&to=`
-- [ ] `GET /api/admin/reports/trips?status=&from=&to=`
-- [ ] `GET /api/admin/reports/drivers`
-- [ ] `GET /api/superadmin/logs?user=&action=&from=&to=`
+- [x] `GET /api/admin/reports/revenue?from=&to=`
+- [x] `GET /api/admin/reports/trips?status=&from=&to=`
+- [x] `GET /api/admin/reports/drivers`
+- [x] `GET /api/superadmin/logs?user=&action=&from=&to=`
 
 #### Commit 2 — `feat(ui): reports.html (admin)`
 - [ ] Date pickers + filters, revenue table + vanilla Canvas bar chart

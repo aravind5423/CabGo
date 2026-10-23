@@ -32,7 +32,7 @@ const driverRoute    = require('./routes/driver');
 const ratingsRoute   = require('./routes/ratings');
 const paymentsRoute  = require('./routes/payments');
 const adminRoute     = require('./routes/admin');
-// const superRoute     = require('./routes/superadmin');
+const superRoute     = require('./routes/superadmin');
 
 const router = new Router();
 authRoute(router);
@@ -41,8 +41,7 @@ driverRoute(router);
 ratingsRoute(router);
 paymentsRoute(router);
 adminRoute(router);
-// Day 8+:
-// superRoute(router);
+superRoute(router);
 
 // ── MIME types ───────────────────────────────────────────────
 const MIME = {

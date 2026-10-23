@@ -1580,5 +1580,522 @@ module.exports = function adminRoute(router) {
     }
   });
 
+  // ==============================================================
+  // REPORTS MODULE (DAY 8)
+  // ==============================================================
+
+  // ── GET /api/admin/reports/revenue ─────────────────────────────
+  // Financial performance, payment method breakdown, daily revenue trends
+  router.get('/api/admin/reports/revenue', async (req, res) => {
+    const guard = requireRole(['admin', 'superadmin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      const { from, to } = req.query || {};
+
+      const whereClauses = ["t.trip_status = 'completed'"];
+      const params = [];
+
+      if (from) {
+        whereClauses.push('DATE(COALESCE(t.end_time, t.start_time, p.paid_at)) >= ?');
+        params.push(from);
+      }
+      if (to) {
+        whereClauses.push('DATE(COALESCE(t.end_time, t.start_time, p.paid_at)) <= ?');
+        params.push(to);
+      }
+
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      // 1. Overall Revenue & Financial KPI Summary
+      const [kpiRows] = await pool.execute(
+        `SELECT 
+           COUNT(DISTINCT t.trip_id) AS total_completed_trips,
+           COALESCE(SUM(COALESCE(p.amount, t.fare, 0)), 0) AS total_revenue,
+           COALESCE(AVG(COALESCE(p.amount, t.fare, 0)), 0) AS avg_fare,
+           COALESCE(SUM(CASE WHEN COALESCE(p.payment_method, 'cash') = 'cash' THEN COALESCE(p.amount, t.fare, 0) ELSE 0 END), 0) AS cash_revenue,
+           COALESCE(SUM(CASE WHEN p.payment_method = 'card' THEN COALESCE(p.amount, t.fare, 0) ELSE 0 END), 0) AS card_revenue,
+           COALESCE(SUM(CASE WHEN p.payment_method = 'wallet' THEN COALESCE(p.amount, t.fare, 0) ELSE 0 END), 0) AS wallet_revenue,
+           COALESCE(COUNT(CASE WHEN COALESCE(p.payment_method, 'cash') = 'cash' THEN 1 END), 0) AS cash_count,
+           COALESCE(COUNT(CASE WHEN p.payment_method = 'card' THEN 1 END), 0) AS card_count,
+           COALESCE(COUNT(CASE WHEN p.payment_method = 'wallet' THEN 1 END), 0) AS wallet_count,
+           COALESCE(SUM(t.distance_km), 0) AS total_distance_km
+         FROM trips t
+         LEFT JOIN payments p ON t.trip_id = p.trip_id
+         ${whereSql}`,
+        params
+      );
+
+      // 2. Revenue breakdown by vehicle type
+      const [vehicleBreakdown] = await pool.execute(
+        `SELECT 
+           COALESCE(v.vehicle_type, rr.vehicle_type, 'sedan') AS vehicle_type,
+           COUNT(t.trip_id) AS trip_count,
+           COALESCE(SUM(COALESCE(p.amount, t.fare, 0)), 0) AS revenue,
+           COALESCE(AVG(COALESCE(p.amount, t.fare, 0)), 0) AS avg_fare
+         FROM trips t
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         LEFT JOIN ride_requests rr ON t.request_id = rr.request_id
+         LEFT JOIN payments p ON t.trip_id = p.trip_id
+         ${whereSql}
+         GROUP BY vehicle_type
+         ORDER BY revenue DESC`,
+        params
+      );
+
+      // 3. Daily Revenue Trend for Canvas Bar Chart
+      const [dailyTrends] = await pool.execute(
+        `SELECT 
+           DATE_FORMAT(COALESCE(t.end_time, t.start_time), '%Y-%m-%d') AS date_label,
+           COUNT(t.trip_id) AS trip_count,
+           COALESCE(SUM(COALESCE(p.amount, t.fare, 0)), 0) AS daily_revenue,
+           COALESCE(AVG(COALESCE(p.amount, t.fare, 0)), 0) AS avg_fare
+         FROM trips t
+         LEFT JOIN payments p ON t.trip_id = p.trip_id
+         ${whereSql}
+         GROUP BY DATE_FORMAT(COALESCE(t.end_time, t.start_time), '%Y-%m-%d')
+         ORDER BY date_label ASC`,
+        params
+      );
+
+      // 4. Detailed Transaction Records (for table & CSV export)
+      const [transactions] = await pool.execute(
+        `SELECT 
+           t.trip_id,
+           COALESCE(p.payment_id, 0) AS payment_id,
+           COALESCE(p.amount, t.fare, 0) AS amount,
+           COALESCE(p.payment_method, 'cash') AS payment_method,
+           COALESCE(p.payment_status, 'completed') AS payment_status,
+           COALESCE(p.paid_at, t.end_time, t.start_time) AS transaction_date,
+           u_p.name AS passenger_name,
+           u_p.email AS passenger_email,
+           u_p.mobile AS passenger_mobile,
+           u_d.name AS driver_name,
+           u_d.email AS driver_email,
+           COALESCE(v.vehicle_type, rr.vehicle_type, 'sedan') AS vehicle_type,
+           COALESCE(v.vehicle_number, 'N/A') AS vehicle_number,
+           COALESCE(t.distance_km, 0) AS distance_km,
+           rr.pickup_location,
+           rr.destination
+         FROM trips t
+         LEFT JOIN payments p ON t.trip_id = p.trip_id
+         JOIN ride_requests rr ON t.request_id = rr.request_id
+         JOIN passenger_profiles pp ON t.passenger_id = pp.passenger_id
+         JOIN users u_p ON pp.user_id = u_p.user_id
+         JOIN driver_profiles dp ON t.driver_id = dp.driver_id
+         JOIN users u_d ON dp.user_id = u_d.user_id
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         ${whereSql}
+         ORDER BY transaction_date DESC
+         LIMIT 200`,
+        params
+      );
+
+      const kpi = kpiRows[0] || {};
+      const totalRev = parseFloat(kpi.total_revenue || 0);
+
+      await logAction({
+        userId: guard.user.user_id,
+        action: 'VIEW_REVENUE_REPORT',
+        description: `Admin queried revenue report (from: ${from || 'start'}, to: ${to || 'now'})`,
+        ip: getClientIp(req)
+      });
+
+      req.sendJSON(200, {
+        success: true,
+        filters: { from: from || null, to: to || null },
+        summary: {
+          total_revenue: totalRev,
+          total_completed_trips: parseInt(kpi.total_completed_trips, 10) || 0,
+          avg_fare: parseFloat(parseFloat(kpi.avg_fare || 0).toFixed(2)),
+          total_distance_km: parseFloat(parseFloat(kpi.total_distance_km || 0).toFixed(2)),
+          payment_methods: {
+            cash: { amount: parseFloat(kpi.cash_revenue || 0), count: parseInt(kpi.cash_count, 10) || 0 },
+            card: { amount: parseFloat(kpi.card_revenue || 0), count: parseInt(kpi.card_count, 10) || 0 },
+            wallet: { amount: parseFloat(kpi.wallet_revenue || 0), count: parseInt(kpi.wallet_count, 10) || 0 }
+          }
+        },
+        vehicle_breakdown: vehicleBreakdown.map(vb => ({
+          vehicle_type: vb.vehicle_type,
+          trip_count: parseInt(vb.trip_count, 10) || 0,
+          revenue: parseFloat(vb.revenue || 0),
+          avg_fare: parseFloat(parseFloat(vb.avg_fare || 0).toFixed(2)),
+          percentage: totalRev > 0 ? parseFloat(((parseFloat(vb.revenue || 0) / totalRev) * 100).toFixed(1)) : 0
+        })),
+        daily_trends: dailyTrends.map(dt => ({
+          date: dt.date_label,
+          trips: parseInt(dt.trip_count, 10) || 0,
+          revenue: parseFloat(dt.daily_revenue || 0),
+          avg_fare: parseFloat(parseFloat(dt.avg_fare || 0).toFixed(2))
+        })),
+        transactions: transactions.map(tx => ({
+          trip_id: tx.trip_id,
+          payment_id: tx.payment_id,
+          amount: parseFloat(tx.amount || 0),
+          payment_method: tx.payment_method,
+          payment_status: tx.payment_status,
+          date: tx.transaction_date,
+          passenger_name: tx.passenger_name,
+          passenger_email: tx.passenger_email,
+          passenger_mobile: tx.passenger_mobile,
+          driver_name: tx.driver_name,
+          driver_email: tx.driver_email,
+          vehicle_type: tx.vehicle_type,
+          vehicle_number: tx.vehicle_number,
+          distance_km: parseFloat(tx.distance_km || 0),
+          pickup: tx.pickup_location,
+          destination: tx.destination
+        }))
+      });
+
+    } catch (err) {
+      console.error('[admin/reports/revenue]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to generate revenue report.' });
+    }
+  });
+
+  // ── GET /api/admin/reports/trips ───────────────────────────────
+  // Operational trip statistics, completion rates, fleet distribution
+  router.get('/api/admin/reports/trips', async (req, res) => {
+    const guard = requireRole(['admin', 'superadmin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      const { status, from, to, vehicle_type, page = 1, limit = 50 } = req.query || {};
+
+      const whereClauses = [];
+      const params = [];
+
+      if (status && status !== 'all') {
+        whereClauses.push('t.trip_status = ?');
+        params.push(status);
+      }
+      if (vehicle_type && vehicle_type !== 'all') {
+        whereClauses.push('(v.vehicle_type = ? OR rr.vehicle_type = ?)');
+        params.push(vehicle_type, vehicle_type);
+      }
+      if (from) {
+        whereClauses.push('DATE(COALESCE(t.start_time, rr.requested_at)) >= ?');
+        params.push(from);
+      }
+      if (to) {
+        whereClauses.push('DATE(COALESCE(t.start_time, rr.requested_at)) <= ?');
+        params.push(to);
+      }
+
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      // 1. Operational KPI stats
+      const [kpiRows] = await pool.execute(
+        `SELECT 
+           COUNT(t.trip_id) AS total_trips,
+           COUNT(CASE WHEN t.trip_status = 'completed' THEN 1 END) AS completed_trips,
+           COUNT(CASE WHEN t.trip_status = 'cancelled' THEN 1 END) AS cancelled_trips,
+           COUNT(CASE WHEN t.trip_status IN ('accepted', 'in_progress') THEN 1 END) AS active_trips,
+           COALESCE(SUM(t.distance_km), 0) AS total_distance_km,
+           COALESCE(AVG(t.distance_km), 0) AS avg_distance_km,
+           COALESCE(AVG(t.fare), 0) AS avg_fare,
+           COALESCE(SUM(t.fare), 0) AS total_fare_volume
+         FROM trips t
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         LEFT JOIN ride_requests rr ON t.request_id = rr.request_id
+         ${whereSql}`,
+        params
+      );
+
+      // 2. Status Breakdown
+      const [statusBreakdown] = await pool.execute(
+        `SELECT 
+           t.trip_status,
+           COUNT(t.trip_id) AS count
+         FROM trips t
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         LEFT JOIN ride_requests rr ON t.request_id = rr.request_id
+         ${whereSql}
+         GROUP BY t.trip_status`,
+        params
+      );
+
+      // 3. Vehicle Type Breakdown
+      const [vehicleBreakdown] = await pool.execute(
+        `SELECT 
+           COALESCE(v.vehicle_type, rr.vehicle_type, 'sedan') AS vehicle_type,
+           COUNT(t.trip_id) AS trip_count,
+           COUNT(CASE WHEN t.trip_status = 'completed' THEN 1 END) AS completed_count,
+           COALESCE(SUM(t.distance_km), 0) AS total_km
+         FROM trips t
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         LEFT JOIN ride_requests rr ON t.request_id = rr.request_id
+         ${whereSql}
+         GROUP BY vehicle_type`,
+        params
+      );
+
+      // 4. Daily Volume Trends
+      const [dailyVolume] = await pool.execute(
+        `SELECT 
+           DATE_FORMAT(COALESCE(t.start_time, rr.requested_at), '%Y-%m-%d') AS date_label,
+           COUNT(t.trip_id) AS total,
+           COUNT(CASE WHEN t.trip_status = 'completed' THEN 1 END) AS completed,
+           COUNT(CASE WHEN t.trip_status = 'cancelled' THEN 1 END) AS cancelled
+         FROM trips t
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         LEFT JOIN ride_requests rr ON t.request_id = rr.request_id
+         ${whereSql}
+         GROUP BY DATE_FORMAT(COALESCE(t.start_time, rr.requested_at), '%Y-%m-%d')
+         ORDER BY date_label ASC`,
+        params
+      );
+
+      // 5. Paginated Trip Log
+      const numLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 50));
+      const numPage  = Math.max(1, parseInt(page, 10) || 1);
+      const offset   = (numPage - 1) * numLimit;
+
+      const [tripRecords] = await pool.execute(
+        `SELECT 
+           t.trip_id,
+           t.trip_status,
+           t.distance_km,
+           t.fare,
+           t.start_time,
+           t.end_time,
+           rr.pickup_location,
+           rr.destination,
+           rr.requested_at,
+           u_p.name AS passenger_name,
+           u_d.name AS driver_name,
+           COALESCE(v.vehicle_type, rr.vehicle_type, 'sedan') AS vehicle_type,
+           COALESCE(v.vehicle_number, 'N/A') AS vehicle_number
+         FROM trips t
+         JOIN ride_requests rr ON t.request_id = rr.request_id
+         JOIN passenger_profiles pp ON t.passenger_id = pp.passenger_id
+         JOIN users u_p ON pp.user_id = u_p.user_id
+         JOIN driver_profiles dp ON t.driver_id = dp.driver_id
+         JOIN users u_d ON dp.user_id = u_d.user_id
+         LEFT JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+         ${whereSql}
+         ORDER BY COALESCE(t.start_time, rr.requested_at) DESC
+         LIMIT ? OFFSET ?`,
+        [...params, numLimit, offset]
+      );
+
+      const kpi = kpiRows[0] || {};
+      const totalTrips = parseInt(kpi.total_trips, 10) || 0;
+      const completedTrips = parseInt(kpi.completed_trips, 10) || 0;
+      const cancelledTrips = parseInt(kpi.cancelled_trips, 10) || 0;
+
+      await logAction({
+        userId: guard.user.user_id,
+        action: 'VIEW_TRIPS_REPORT',
+        description: `Admin queried trips analytics report (status: ${status || 'all'}, vehicle: ${vehicle_type || 'all'})`,
+        ip: getClientIp(req)
+      });
+
+      req.sendJSON(200, {
+        success: true,
+        summary: {
+          total_trips: totalTrips,
+          completed_trips: completedTrips,
+          cancelled_trips: cancelledTrips,
+          active_trips: parseInt(kpi.active_trips, 10) || 0,
+          completion_rate: totalTrips > 0 ? parseFloat(((completedTrips / totalTrips) * 100).toFixed(1)) : 0,
+          cancellation_rate: totalTrips > 0 ? parseFloat(((cancelledTrips / totalTrips) * 100).toFixed(1)) : 0,
+          total_distance_km: parseFloat(parseFloat(kpi.total_distance_km || 0).toFixed(2)),
+          avg_distance_km: parseFloat(parseFloat(kpi.avg_distance_km || 0).toFixed(2)),
+          avg_fare: parseFloat(parseFloat(kpi.avg_fare || 0).toFixed(2)),
+          total_fare_volume: parseFloat(parseFloat(kpi.total_fare_volume || 0).toFixed(2))
+        },
+        status_breakdown: statusBreakdown.reduce((acc, row) => {
+          acc[row.trip_status] = parseInt(row.count, 10) || 0;
+          return acc;
+        }, {}),
+        vehicle_breakdown: vehicleBreakdown.map(vb => ({
+          vehicle_type: vb.vehicle_type,
+          trip_count: parseInt(vb.trip_count, 10) || 0,
+          completed_count: parseInt(vb.completed_count, 10) || 0,
+          total_km: parseFloat(parseFloat(vb.total_km || 0).toFixed(2))
+        })),
+        daily_trends: dailyVolume.map(dv => ({
+          date: dv.date_label,
+          total: parseInt(dv.total, 10) || 0,
+          completed: parseInt(dv.completed, 10) || 0,
+          cancelled: parseInt(dv.cancelled, 10) || 0
+        })),
+        pagination: {
+          total: totalTrips,
+          page: numPage,
+          limit: numLimit,
+          total_pages: Math.ceil(totalTrips / numLimit) || 1
+        },
+        trips: tripRecords.map(tr => ({
+          trip_id: tr.trip_id,
+          status: tr.trip_status,
+          distance_km: parseFloat(tr.distance_km || 0),
+          fare: parseFloat(tr.fare || 0),
+          start_time: tr.start_time,
+          end_time: tr.end_time,
+          pickup: tr.pickup_location,
+          destination: tr.destination,
+          passenger_name: tr.passenger_name,
+          driver_name: tr.driver_name,
+          vehicle_type: tr.vehicle_type,
+          vehicle_number: tr.vehicle_number
+        }))
+      });
+
+    } catch (err) {
+      console.error('[admin/reports/trips]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to generate trips report.' });
+    }
+  });
+
+  // ── GET /api/admin/reports/drivers ─────────────────────────────
+  // Driver fleet performance, completed trips, earnings & satisfaction ratings
+  router.get('/api/admin/reports/drivers', async (req, res) => {
+    const guard = requireRole(['admin', 'superadmin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      const { status = 'all', sort = 'revenue', order = 'desc', limit = 50, page = 1 } = req.query || {};
+
+      const whereClauses = [];
+      const params = [];
+
+      if (status && status !== 'all') {
+        whereClauses.push('dp.verification_status = ?');
+        params.push(status);
+      }
+
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      // Validate sort field
+      let orderBySql = 'total_revenue DESC';
+      const ord = (order || '').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+      switch (sort) {
+        case 'trips':
+          orderBySql = `completed_trips ${ord}, total_revenue DESC`;
+          break;
+        case 'rating':
+          orderBySql = `effective_rating ${ord}, completed_trips DESC`;
+          break;
+        case 'name':
+          orderBySql = `u.name ${ord}`;
+          break;
+        case 'revenue':
+        default:
+          orderBySql = `total_revenue ${ord}, completed_trips DESC`;
+          break;
+      }
+
+      // 1. High-level summary across all drivers
+      const [summaryRows] = await pool.execute(
+        `SELECT 
+           COUNT(dp.driver_id) AS total_drivers,
+           COUNT(CASE WHEN dp.verification_status = 'approved' THEN 1 END) AS approved_drivers,
+           COUNT(CASE WHEN dp.verification_status = 'pending' THEN 1 END) AS pending_drivers,
+           COUNT(CASE WHEN dp.availability = 'online' THEN 1 END) AS online_drivers,
+           COALESCE(AVG(dp.rating), 0) AS avg_fleet_rating
+         FROM driver_profiles dp`
+      );
+
+      // 2. Comprehensive Driver Performance Table
+      const [driverRows] = await pool.execute(
+        `SELECT 
+           dp.driver_id,
+           dp.user_id,
+           u.name,
+           u.email,
+           u.mobile,
+           u.status AS account_status,
+           dp.license_no,
+           dp.license_expiry,
+           dp.verification_status,
+           dp.availability,
+           dp.rating AS base_rating,
+           v.vehicle_number,
+           v.vehicle_type,
+           v.model AS vehicle_model,
+           COUNT(DISTINCT t.trip_id) AS total_trips,
+           COUNT(DISTINCT CASE WHEN t.trip_status = 'completed' THEN t.trip_id END) AS completed_trips,
+           COUNT(DISTINCT CASE WHEN t.trip_status = 'cancelled' THEN t.trip_id END) AS cancelled_trips,
+           COALESCE(SUM(CASE WHEN t.trip_status = 'completed' THEN COALESCE(p.amount, t.fare, 0) ELSE 0 END), 0) AS total_revenue,
+           COALESCE(AVG(CASE WHEN t.trip_status = 'completed' THEN COALESCE(p.amount, t.fare, 0) ELSE NULL END), 0) AS avg_trip_fare,
+           COALESCE(AVG(rr.rating), dp.rating) AS effective_rating,
+           COUNT(DISTINCT rr.review_id) AS review_count
+         FROM driver_profiles dp
+         JOIN users u ON dp.user_id = u.user_id
+         LEFT JOIN vehicles v ON dp.driver_id = v.driver_id AND v.status = 'active'
+         LEFT JOIN trips t ON dp.driver_id = t.driver_id
+         LEFT JOIN payments p ON t.trip_id = p.trip_id
+         LEFT JOIN ratings_reviews rr ON t.trip_id = rr.trip_id AND rr.reviewed_user_id = u.user_id
+         ${whereSql}
+         GROUP BY dp.driver_id, v.vehicle_id
+         ORDER BY ${orderBySql}`
+      );
+
+      const summary = summaryRows[0] || {};
+      const totalDrivers = driverRows.length;
+      const topPerformer = driverRows.length > 0 ? {
+        name: driverRows[0].name,
+        trips: parseInt(driverRows[0].completed_trips, 10) || 0,
+        revenue: parseFloat(driverRows[0].total_revenue || 0)
+      } : null;
+
+      await logAction({
+        userId: guard.user.user_id,
+        action: 'VIEW_DRIVERS_REPORT',
+        description: `Admin queried drivers performance report (status: ${status}, sort: ${sort})`,
+        ip: getClientIp(req)
+      });
+
+      req.sendJSON(200, {
+        success: true,
+        summary: {
+          total_drivers: parseInt(summary.total_drivers, 10) || 0,
+          approved_drivers: parseInt(summary.approved_drivers, 10) || 0,
+          pending_drivers: parseInt(summary.pending_drivers, 10) || 0,
+          online_drivers: parseInt(summary.online_drivers, 10) || 0,
+          avg_fleet_rating: parseFloat(parseFloat(summary.avg_fleet_rating || 0).toFixed(2)),
+          top_performer: topPerformer
+        },
+        drivers: driverRows.map(d => {
+          const tot = parseInt(d.total_trips, 10) || 0;
+          const comp = parseInt(d.completed_trips, 10) || 0;
+          return {
+            driver_id: d.driver_id,
+            user_id: d.user_id,
+            name: d.name,
+            email: d.email,
+            mobile: d.mobile,
+            account_status: d.account_status,
+            license_no: d.license_no,
+            license_expiry: d.license_expiry,
+            verification_status: d.verification_status,
+            availability: d.availability,
+            rating: parseFloat(parseFloat(d.effective_rating || d.base_rating || 0).toFixed(2)),
+            review_count: parseInt(d.review_count, 10) || 0,
+            vehicle: d.vehicle_number ? {
+              number: d.vehicle_number,
+              type: d.vehicle_type,
+              model: d.vehicle_model
+            } : null,
+            total_trips: tot,
+            completed_trips: comp,
+            cancelled_trips: parseInt(d.cancelled_trips, 10) || 0,
+            completion_rate: tot > 0 ? parseFloat(((comp / tot) * 100).toFixed(1)) : 0,
+            total_revenue: parseFloat(d.total_revenue || 0),
+            avg_trip_fare: parseFloat(parseFloat(d.avg_trip_fare || 0).toFixed(2))
+          };
+        })
+      });
+
+    } catch (err) {
+      console.error('[admin/reports/drivers]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to generate drivers report.' });
+    }
+  });
+
 };
 
