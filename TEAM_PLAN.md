@@ -273,8 +273,8 @@ cab-booking/                          ← project root
 - [x] `GET /api/superadmin/logs?user=&action=&from=&to=`
 
 #### Commit 2 — `feat(ui): reports.html (admin)`
-- [ ] Date pickers + filters, revenue table + vanilla Canvas bar chart
-- [ ] Driver performance table, CSV export via DOM Blob download
+- [x] Date pickers + filters, revenue table + vanilla Canvas bar chart
+- [x] Driver performance table, CSV export via DOM Blob download
 
 #### Commit 3 — `feat(api+ui): superadmin – admins + permissions`
 - [ ] `GET/POST/PUT/DELETE /api/superadmin/admins`
