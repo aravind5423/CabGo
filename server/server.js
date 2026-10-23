@@ -24,6 +24,9 @@ if (fs.existsSync(envPath)) {
   }
 }
 
+// ── Middleware & Security ─────────────────────────────────────
+const { checkRateLimit } = require('./middleware/rateLimit');
+
 // ── Route handlers ───────────────────────────────────────────
 const Router         = require('./router');
 const authRoute      = require('./routes/auth');
@@ -58,23 +61,57 @@ const MIME = {
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const PORT       = process.env.SERVER_PORT || 5000;
 
-// ── Helper: send JSON ────────────────────────────────────────
-function sendJSON(res, status, data) {
+// ── Security Helper: resolve client IP ────────────────────────
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || '127.0.0.1';
+}
+
+// ── Security Helper: recursive input sanitization ─────────────
+function sanitizeInput(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    return obj.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeInput);
+  }
+  if (typeof obj === 'object') {
+    const clean = {};
+    for (const [key, val] of Object.entries(obj)) {
+      clean[key] = sanitizeInput(val);
+    }
+    return clean;
+  }
+  return obj;
+}
+
+// ── Helper: send JSON with enhanced CORS & Security Headers ───
+function sendJSON(res, status, data, extraHeaders = {}) {
   res.writeHead(status, {
-    'Content-Type':                'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Content-Type':                 'application/json',
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'X-Content-Type-Options':       'nosniff',
+    'X-Frame-Options':              'DENY',
+    ...extraHeaders
   });
   res.end(JSON.stringify(data));
 }
 
-// ── Helper: read body ────────────────────────────────────────
+// ── Helper: read body with sanitization ───────────────────────
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
     req.on('data', chunk => { raw += chunk; });
     req.on('end', () => {
       try {
-        resolve(raw ? JSON.parse(raw) : {});
+        const parsed = raw ? JSON.parse(raw) : {};
+        resolve(sanitizeInput(parsed));
       } catch {
         reject(new Error('Invalid JSON body'));
       }
@@ -92,7 +129,10 @@ function serveStatic(res, filePath) {
       return;
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff'
+    });
     res.end(data);
   });
 }
@@ -106,8 +146,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Max-Age':       '86400',
     });
     res.end();
     return;
@@ -115,6 +156,24 @@ const server = http.createServer(async (req, res) => {
 
   // ── API routes ──
   if (pathname.startsWith('/api/')) {
+    // 1. In-memory IP rate limiting
+    const clientIp = getClientIp(req);
+    const rateCheck = checkRateLimit(clientIp, pathname);
+
+    if (!rateCheck.allowed) {
+      const retryAfterSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000));
+      sendJSON(res, 429, {
+        success: false,
+        message: 'Too many requests. Rate limit exceeded, please try again shortly.'
+      }, {
+        'Retry-After': String(retryAfterSec),
+        'X-RateLimit-Limit': String(rateCheck.limit),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(Math.ceil(rateCheck.resetTime / 1000))
+      });
+      return;
+    }
+
     const match = router.match(req);
     if (!match) {
       sendJSON(res, 404, { success: false, message: 'API endpoint not found' });
@@ -122,7 +181,7 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       req.body     = await readBody(req);
-      req.sendJSON = (status, data) => sendJSON(res, status, data);
+      req.sendJSON = (status, data, extraHeaders) => sendJSON(res, status, data, extraHeaders);
       await match.handler(req, res);
     } catch (err) {
       console.error('[server] API error:', err.message);

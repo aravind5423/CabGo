@@ -296,11 +296,11 @@ cab-booking/                          ← project root
 - [x] `PUT /api/superadmin/settings`
 
 #### Commit 3 — `feat(security): input validation, rate limiting, RBAC hardening`
-- [ ] Server-side input sanitization on all POST/PUT routes
-- [ ] `server/middleware/rateLimit.js` — in-memory IP rate limiting
-- [ ] Audit all routes: token + role enforced everywhere
-- [ ] CORS headers in `server.js`
-- [ ] `system_logs` written on all CUD operations
+- [x] Server-side input sanitization on all POST/PUT routes
+- [x] `server/middleware/rateLimit.js` — in-memory IP rate limiting
+- [x] Audit all routes: token + role enforced everywhere
+- [x] CORS headers in `server.js`
+- [x] `system_logs` written on all CUD operations
 
 ---
 
