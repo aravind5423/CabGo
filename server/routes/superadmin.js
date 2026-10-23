@@ -31,6 +31,234 @@ const AVAILABLE_PERMISSIONS = [
 module.exports = function superadminRoute(router) {
 
   // ==============================================================
+  // 0. SUPERADMIN DASHBOARD OVERVIEW & GLOBAL TELEMETRY
+  // ==============================================================
+
+  // ── GET /api/superadmin/overview ───────────────────────────────
+  // Consolidated system-wide telemetry, user distribution, fleet metrics, admin overview, and recent audit logs
+  async function handleSuperadminOverview(req, res) {
+    const guard = requireRole(['superadmin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      // 1. User population counts
+      const [uCounts] = await pool.execute(
+        `SELECT 
+           COUNT(*) AS total_users,
+           SUM(CASE WHEN role = 'passenger' THEN 1 ELSE 0 END) AS passengers_count,
+           SUM(CASE WHEN role = 'driver' THEN 1 ELSE 0 END) AS drivers_count,
+           SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admins_count,
+           SUM(CASE WHEN role = 'superadmin' THEN 1 ELSE 0 END) AS superadmins_count,
+           SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_users,
+           SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked_users,
+           SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactive_users,
+           SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) AS new_users_7d
+         FROM users`
+      );
+
+      // 2. Driver compliance & live status
+      const [dCounts] = await pool.execute(
+        `SELECT 
+           COUNT(*) AS total_drivers,
+           SUM(CASE WHEN dp.verification_status = 'pending' THEN 1 ELSE 0 END) AS pending_drivers,
+           SUM(CASE WHEN dp.verification_status = 'approved' THEN 1 ELSE 0 END) AS approved_drivers,
+           SUM(CASE WHEN dp.verification_status = 'rejected' THEN 1 ELSE 0 END) AS rejected_drivers,
+           SUM(CASE WHEN dp.availability = 'online' THEN 1 ELSE 0 END) AS online_drivers
+         FROM driver_profiles dp`
+      );
+
+      // 3. Vehicles fleet metrics
+      const [vCounts] = await pool.execute(
+        `SELECT 
+           COUNT(*) AS total_vehicles,
+           SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_vehicles,
+           SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) AS inactive_vehicles,
+           SUM(CASE WHEN vehicle_type = 'sedan' THEN 1 ELSE 0 END) AS sedan_count,
+           SUM(CASE WHEN vehicle_type = 'suv' THEN 1 ELSE 0 END) AS suv_count,
+           SUM(CASE WHEN vehicle_type = 'hatchback' THEN 1 ELSE 0 END) AS hatchback_count,
+           SUM(CASE WHEN vehicle_type = 'auto' THEN 1 ELSE 0 END) AS auto_count,
+           SUM(CASE WHEN vehicle_type = 'bike' THEN 1 ELSE 0 END) AS bike_count
+         FROM vehicles`
+      );
+
+      // 4. Trips performance & Gross Merchandise Value
+      const [tCounts] = await pool.execute(
+        `SELECT 
+           COUNT(*) AS total_trips,
+           SUM(CASE WHEN trip_status = 'completed' THEN 1 ELSE 0 END) AS completed_trips,
+           SUM(CASE WHEN trip_status = 'in_progress' THEN 1 ELSE 0 END) AS active_trips,
+           SUM(CASE WHEN trip_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_trips,
+           COALESCE(SUM(CASE WHEN trip_status = 'completed' THEN fare ELSE 0 END), 0) AS total_revenue
+         FROM trips`
+      );
+
+      // 5. System logs & audit activity
+      const [logCounts] = await pool.execute(
+        `SELECT 
+           COUNT(*) AS total_logs,
+           SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) AS logs_today,
+           COUNT(DISTINCT ip_address) AS distinct_ips
+         FROM system_logs`
+      );
+
+      // 6. Top action breakdown for canvas visualization
+      const [topActions] = await pool.execute(
+        `SELECT action, COUNT(*) AS count
+         FROM system_logs
+         GROUP BY action
+         ORDER BY count DESC
+         LIMIT 6`
+      );
+
+      // 7. Administrators overview list with permissions count
+      const [admins] = await pool.execute(
+        `SELECT 
+           u.user_id,
+           u.name,
+           u.email,
+           u.mobile,
+           u.role,
+           u.status,
+           u.created_at,
+           COUNT(ap.permission_id) AS permissions_count,
+           GROUP_CONCAT(ap.permission_name ORDER BY ap.permission_name ASC SEPARATOR ',') AS permissions_str
+         FROM users u
+         LEFT JOIN admin_permissions ap ON u.user_id = ap.admin_id
+         WHERE u.role IN ('admin', 'superadmin')
+         GROUP BY u.user_id
+         ORDER BY u.role DESC, u.created_at ASC`
+      );
+
+      // 8. Recent 8 system audit logs
+      const [recentLogs] = await pool.execute(
+        `SELECT 
+           sl.log_id,
+           sl.user_id,
+           sl.action,
+           sl.description,
+           sl.ip_address,
+           sl.created_at,
+           COALESCE(u.name, 'System') AS user_name,
+           COALESCE(u.email, 'system@cab.com') AS user_email,
+           COALESCE(u.role, 'system') AS user_role
+         FROM system_logs sl
+         LEFT JOIN users u ON sl.user_id = u.user_id
+         ORDER BY sl.created_at DESC, sl.log_id DESC
+         LIMIT 8`
+      );
+
+      const uRow = uCounts[0] || {};
+      const dRow = dCounts[0] || {};
+      const vRow = vCounts[0] || {};
+      const tRow = tCounts[0] || {};
+      const lRow = logCounts[0] || {};
+
+      const totalAdmins = parseInt(uRow.admins_count, 10) || 0;
+      const totalSuperadmins = parseInt(uRow.superadmins_count, 10) || 0;
+      const activeAdminsCount = admins.filter(a => a.status === 'active').length;
+      const inactiveAdminsCount = admins.length - activeAdminsCount;
+
+      req.sendJSON(200, {
+        success: true,
+        stats: {
+          users: {
+            total: parseInt(uRow.total_users, 10) || 0,
+            passengers: parseInt(uRow.passengers_count, 10) || 0,
+            drivers: parseInt(uRow.drivers_count, 10) || 0,
+            admins: totalAdmins,
+            superadmins: totalSuperadmins,
+            active: parseInt(uRow.active_users, 10) || 0,
+            blocked: parseInt(uRow.blocked_users, 10) || 0,
+            inactive: parseInt(uRow.inactive_users, 10) || 0,
+            new_7d: parseInt(uRow.new_users_7d, 10) || 0
+          },
+          drivers: {
+            total: parseInt(dRow.total_drivers, 10) || 0,
+            approved: parseInt(dRow.approved_drivers, 10) || 0,
+            pending: parseInt(dRow.pending_drivers, 10) || 0,
+            rejected: parseInt(dRow.rejected_drivers, 10) || 0,
+            online: parseInt(dRow.online_drivers, 10) || 0
+          },
+          fleet: {
+            total: parseInt(vRow.total_vehicles, 10) || 0,
+            active: parseInt(vRow.active_vehicles, 10) || 0,
+            inactive: parseInt(vRow.inactive_vehicles, 10) || 0,
+            sedan: parseInt(vRow.sedan_count, 10) || 0,
+            suv: parseInt(vRow.suv_count, 10) || 0,
+            hatchback: parseInt(vRow.hatchback_count, 10) || 0,
+            auto: parseInt(vRow.auto_count, 10) || 0,
+            bike: parseInt(vRow.bike_count, 10) || 0
+          },
+          trips: {
+            total: parseInt(tRow.total_trips, 10) || 0,
+            completed: parseInt(tRow.completed_trips, 10) || 0,
+            active: parseInt(tRow.active_trips, 10) || 0,
+            cancelled: parseInt(tRow.cancelled_trips, 10) || 0,
+            revenue: parseFloat(tRow.total_revenue) || 0
+          },
+          admins: {
+            total: admins.length,
+            superadmins: totalSuperadmins,
+            active: activeAdminsCount,
+            inactive: inactiveAdminsCount
+          },
+          audit: {
+            total_logs: parseInt(lRow.total_logs, 10) || 0,
+            logs_today: parseInt(lRow.logs_today, 10) || 0,
+            distinct_ips: parseInt(lRow.distinct_ips, 10) || 0
+          }
+        },
+        chart_data: {
+          role_dist: [
+            { label: 'Passengers', count: parseInt(uRow.passengers_count, 10) || 0, color: '#3B82F6' },
+            { label: 'Drivers', count: parseInt(uRow.drivers_count, 10) || 0, color: '#10B981' },
+            { label: 'Admins', count: totalAdmins, color: '#6366F1' },
+            { label: 'Superadmins', count: totalSuperadmins, color: '#F59E0B' }
+          ],
+          trip_dist: [
+            { label: 'Completed', count: parseInt(tRow.completed_trips, 10) || 0, color: '#10B981' },
+            { label: 'In Progress', count: parseInt(tRow.active_trips, 10) || 0, color: '#3B82F6' },
+            { label: 'Cancelled', count: parseInt(tRow.cancelled_trips, 10) || 0, color: '#EF4444' }
+          ],
+          top_actions: topActions.map(a => ({
+            action: a.action,
+            count: parseInt(a.count, 10) || 0
+          }))
+        },
+        admins: admins.map(a => ({
+          user_id: a.user_id,
+          name: a.name,
+          email: a.email,
+          mobile: a.mobile,
+          role: a.role,
+          status: a.status,
+          created_at: a.created_at,
+          permissions_count: parseInt(a.permissions_count, 10) || 0,
+          permissions: a.permissions_str ? a.permissions_str.split(',') : []
+        })),
+        recent_logs: recentLogs.map(l => ({
+          log_id: l.log_id,
+          user_id: l.user_id,
+          user_name: l.user_name,
+          user_email: l.user_email,
+          user_role: l.user_role,
+          action: l.action,
+          description: l.description,
+          ip_address: l.ip_address,
+          created_at: l.created_at
+        }))
+      });
+
+    } catch (err) {
+      console.error('[superadmin/overview]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to retrieve superadmin telemetry.' });
+    }
+  }
+
+  router.get('/api/superadmin/overview', handleSuperadminOverview);
+  router.get('/api/superadmin/stats', handleSuperadminOverview);
+
+  // ==============================================================
   // 1. SYSTEM LOGS & AUDIT TRAIL
   // ==============================================================
 

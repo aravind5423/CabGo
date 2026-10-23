@@ -288,8 +288,8 @@ cab-booking/                          ← project root
 **Goal**: Super Admin panel complete; security & middleware polished
 
 #### Commit 1 — `feat(ui): superadmin-dashboard.html + system-logs.html`
-- [ ] Dashboard: global KPIs, all admin overview
-- [ ] System logs: filter by user/action/date/IP, paginated DOM table
+- [x] Dashboard: global KPIs, all admin overview
+- [x] System logs: filter by user/action/date/IP, paginated DOM table
 
 #### Commit 2 — `feat(ui): system-settings.html`
 - [ ] Platform settings: name, currency, max cancellations, maintenance mode toggle
