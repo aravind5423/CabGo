@@ -292,8 +292,8 @@ cab-booking/                          ← project root
 - [x] System logs: filter by user/action/date/IP, paginated DOM table
 
 #### Commit 2 — `feat(ui): system-settings.html`
-- [ ] Platform settings: name, currency, max cancellations, maintenance mode toggle
-- [ ] `PUT /api/superadmin/settings`
+- [x] Platform settings: name, currency, max cancellations, maintenance mode toggle
+- [x] `PUT /api/superadmin/settings`
 
 #### Commit 3 — `feat(security): input validation, rate limiting, RBAC hardening`
 - [ ] Server-side input sanitization on all POST/PUT routes

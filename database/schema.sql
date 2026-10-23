@@ -209,3 +209,13 @@ CREATE TABLE IF NOT EXISTS system_logs (
   INDEX idx_sl_action    (action),
   INDEX idx_sl_created   (created_at)
 ) ENGINE=InnoDB;
+
+-- ============================================================
+-- 13. SYSTEM SETTINGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS system_settings (
+  setting_key   VARCHAR(50) PRIMARY KEY,
+  setting_value TEXT NOT NULL,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+

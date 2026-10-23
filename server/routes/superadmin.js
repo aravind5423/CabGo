@@ -809,4 +809,173 @@ module.exports = function superadminRoute(router) {
     }
   });
 
+  // ==============================================================
+  // 4. PLATFORM SYSTEM SETTINGS
+  // ==============================================================
+
+  const DEFAULT_SETTINGS = {
+    platform_name: 'CabGo Transit Network',
+    currency: 'INR',
+    currency_symbol: '₹',
+    support_email: 'support@cabgo.com',
+    support_phone: '+91 98765 43210',
+    operating_city: 'Bengaluru, Karnataka',
+    max_cancellations: 3,
+    maintenance_mode: false,
+    driver_commission_pct: 15,
+    tax_pct: 5,
+    surge_multiplier_max: 2.5,
+    booking_timeout_sec: 60,
+    session_timeout_hours: 24
+  };
+
+  let inMemorySettings = { ...DEFAULT_SETTINGS };
+
+  // Helper to load settings from DB or fallback
+  async function getStoredSettings() {
+    try {
+      const [rows] = await pool.execute('SELECT setting_key, setting_value FROM system_settings');
+      if (rows && rows.length > 0) {
+        const dbSettings = {};
+        for (const r of rows) {
+          try {
+            dbSettings[r.setting_key] = JSON.parse(r.setting_value);
+          } catch {
+            dbSettings[r.setting_key] = r.setting_value;
+          }
+        }
+        return { ...DEFAULT_SETTINGS, ...inMemorySettings, ...dbSettings };
+      }
+    } catch (err) {
+      // Table may not exist yet or connection issue, use in-memory
+    }
+    return { ...DEFAULT_SETTINGS, ...inMemorySettings };
+  }
+
+  // ── GET /api/superadmin/settings ───────────────────────────────
+  // Retrieve global system settings
+  router.get('/api/superadmin/settings', async (req, res) => {
+    const guard = requireRole(['superadmin', 'admin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    try {
+      const settings = await getStoredSettings();
+      req.sendJSON(200, {
+        success: true,
+        settings
+      });
+    } catch (err) {
+      console.error('[superadmin/settings/get]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to retrieve system settings.' });
+    }
+  });
+
+  // ── PUT /api/superadmin/settings ───────────────────────────────
+  // Update global system settings
+  router.put('/api/superadmin/settings', async (req, res) => {
+    const guard = requireRole(['superadmin'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+
+    const payload = req.body || {};
+
+    try {
+      const current = await getStoredSettings();
+      const updated = { ...current };
+
+      if (payload.platform_name && typeof payload.platform_name === 'string') {
+        updated.platform_name = payload.platform_name.trim();
+      }
+      if (payload.currency && typeof payload.currency === 'string') {
+        updated.currency = payload.currency.trim().toUpperCase();
+      }
+      if (payload.currency_symbol && typeof payload.currency_symbol === 'string') {
+        updated.currency_symbol = payload.currency_symbol.trim();
+      }
+      if (payload.support_email && typeof payload.support_email === 'string') {
+        if (!EMAIL_RE.test(payload.support_email)) {
+          return req.sendJSON(400, { success: false, message: 'Invalid support email address.' });
+        }
+        updated.support_email = payload.support_email.trim();
+      }
+      if (payload.support_phone && typeof payload.support_phone === 'string') {
+        updated.support_phone = payload.support_phone.trim();
+      }
+      if (payload.operating_city && typeof payload.operating_city === 'string') {
+        updated.operating_city = payload.operating_city.trim();
+      }
+      if (payload.max_cancellations !== undefined) {
+        const val = parseInt(payload.max_cancellations, 10);
+        if (isNaN(val) || val < 1 || val > 20) {
+          return req.sendJSON(400, { success: false, message: 'Max cancellations must be between 1 and 20.' });
+        }
+        updated.max_cancellations = val;
+      }
+      if (payload.maintenance_mode !== undefined) {
+        updated.maintenance_mode = Boolean(payload.maintenance_mode);
+      }
+      if (payload.driver_commission_pct !== undefined) {
+        const val = parseFloat(payload.driver_commission_pct);
+        if (isNaN(val) || val < 0 || val > 60) {
+          return req.sendJSON(400, { success: false, message: 'Commission must be between 0% and 60%.' });
+        }
+        updated.driver_commission_pct = val;
+      }
+      if (payload.tax_pct !== undefined) {
+        const val = parseFloat(payload.tax_pct);
+        if (isNaN(val) || val < 0 || val > 30) {
+          return req.sendJSON(400, { success: false, message: 'Tax percentage must be between 0% and 30%.' });
+        }
+        updated.tax_pct = val;
+      }
+      if (payload.booking_timeout_sec !== undefined) {
+        const val = parseInt(payload.booking_timeout_sec, 10);
+        if (isNaN(val) || val < 15 || val > 300) {
+          return req.sendJSON(400, { success: false, message: 'Booking timeout must be between 15 and 300 seconds.' });
+        }
+        updated.booking_timeout_sec = val;
+      }
+      if (payload.session_timeout_hours !== undefined) {
+        const val = parseInt(payload.session_timeout_hours, 10);
+        if (isNaN(val) || val < 1 || val > 168) {
+          return req.sendJSON(400, { success: false, message: 'Session timeout must be between 1 and 168 hours.' });
+        }
+        updated.session_timeout_hours = val;
+      }
+
+      // Update in-memory
+      inMemorySettings = { ...updated };
+
+      // Persist to DB table if table exists
+      try {
+        for (const [key, val] of Object.entries(updated)) {
+          await pool.execute(
+            `INSERT INTO system_settings (setting_key, setting_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+            [key, JSON.stringify(val)]
+          );
+        }
+      } catch (dbErr) {
+        // In-memory fallback
+      }
+
+      await logAction({
+        userId: guard.user.user_id,
+        action: 'UPDATE_SETTINGS',
+        description: `Superadmin updated platform system settings (maintenance_mode: ${updated.maintenance_mode})`,
+        ip: getClientIp(req)
+      });
+
+      req.sendJSON(200, {
+        success: true,
+        message: 'Platform settings saved successfully.',
+        settings: updated
+      });
+
+    } catch (err) {
+      console.error('[superadmin/settings/put]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to update system settings.' });
+    }
+  });
+
 };
