@@ -1,1 +1,342 @@
-<!-- TODO: manage admins -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Administrators & Operators — CabGo Super Admin</title>
+  <meta name="description" content="Provision operations admin accounts, configure security credentials, toggle account activation, and audit administrator activity." />
+  
+  <link rel="stylesheet" href="/css/global.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <script src="/js/router-guard.js" data-role="superadmin"></script>
+
+  <style>
+    .perm-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-pill, 9999px);
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: #F6F7F3;
+      color: var(--text-dark, #111315);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      margin: 2px 2px;
+    }
+    .perm-chip.highlight {
+      background: var(--accent-lime-subtle, rgba(212, 240, 56, 0.2));
+      border-color: rgba(212, 240, 56, 0.6);
+      color: #111315;
+    }
+    .role-badge-super {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FDE68A;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-pill);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .role-badge-admin {
+      background: #E0E7FF;
+      color: #3730A3;
+      border: 1px solid #C7D2FE;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-pill);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .modal-checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.65rem;
+      margin-top: 0.5rem;
+    }
+    .modal-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      background: #F6F7F3;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .modal-checkbox-label:hover {
+      background: #E8EBE1;
+    }
+    .modal-checkbox-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #111315;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Pill Navbar -->
+  <nav class="dash-navbar" aria-label="Super Admin Navigation">
+    <a href="/superadmin/dashboard.html" class="dash-brand">
+      <div class="dash-brand-icon" style="background:#F59E0B; color:#111315;">👑</div>
+      <span>CabGo <span style="font-weight:400; font-size:0.85em; opacity:0.6;">SuperAdmin</span></span>
+    </a>
+
+    <ul class="dash-nav-links">
+      <li><a href="/admin/dashboard.html" class="dash-nav-link">📊 Admin Ops</a></li>
+      <li><a href="/superadmin/manage-admins.html" class="dash-nav-link active">🛡️ Admins</a></li>
+      <li><a href="/superadmin/permissions.html" class="dash-nav-link">🔐 Permissions</a></li>
+      <li><a href="/superadmin/system-logs.html" class="dash-nav-link">📜 System Logs</a></li>
+      <li><a href="/superadmin/system-settings.html" class="dash-nav-link">⚙️ Settings</a></li>
+    </ul>
+
+    <div class="dash-user-menu">
+      <div style="text-align:right;">
+        <div data-user-name style="font-size:0.85rem; font-weight:800; color:var(--text-dark);">Super Administrator</div>
+        <div data-user-role style="font-size:0.75rem; color:#D97706; font-weight:700;">Governance</div>
+      </div>
+      <button id="logoutBtn" class="action-btn" style="border-radius:var(--radius-pill); padding:0.45rem 0.9rem;">
+        🚪 Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="app-main">
+    <div class="app-container">
+
+      <!-- Header Row -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1.25rem; margin-bottom:1.75rem; padding-top:0.75rem;">
+        <div>
+          <h1 style="font-family:var(--font-heading); font-size:2.2rem; font-weight:900; color:var(--text-dark); letter-spacing:-0.03em;">
+            Administrator Accounts & Governance
+          </h1>
+          <p style="color:var(--text-muted); font-size:0.95rem; margin-top:0.3rem;">
+            Provision operations administrators, configure RBAC operational scopes, activate/suspend personnel, and govern system privileges.
+          </p>
+        </div>
+
+        <button id="btnOpenCreateAdminModal" class="btn-primary" style="display:flex; align-items:center; gap:0.5rem; border-radius:var(--radius-pill);">
+          <span>➕</span> Provision New Admin
+        </button>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Total Administrators</span>
+            <span>🛡️</span>
+          </div>
+          <div class="kpi-value" id="kpiTotalAdmins">0</div>
+          <div class="kpi-sub">Accounts with administrative scope</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Active Operators</span>
+            <span>🟢</span>
+          </div>
+          <div class="kpi-value" id="kpiActiveAdmins">0</div>
+          <div class="kpi-sub">Authorized to access ops panels</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Suspended / Inactive</span>
+            <span>⏸️</span>
+          </div>
+          <div class="kpi-value" id="kpiInactiveAdmins">0</div>
+          <div class="kpi-sub">Revoked login access</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">
+            <span>Super Administrators</span>
+            <span>👑</span>
+          </div>
+          <div class="kpi-value" id="kpiSuperAdmins">0</div>
+          <div class="kpi-sub">Full system governance privileges</div>
+        </div>
+      </div>
+
+      <!-- Admin Directory Table Card -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">
+              <span>👥</span> Administrative Directory & Credentials
+            </div>
+            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:3px;">
+              Manage personnel credentials, toggle operational activation, and edit assigned permissions
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <div class="search-input-wrap" style="max-width:260px;">
+              <input type="text" id="adminSearchInput" placeholder="Search by name, email, phone..." />
+            </div>
+
+            <select id="filterAdminStatus" class="form-select" style="padding:0.45rem 1rem; border-radius:var(--radius-pill); font-size:0.85rem;">
+              <option value="all">All Account Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive / Suspended</option>
+            </select>
+
+            <select id="filterAdminRole" class="form-select" style="padding:0.45rem 1rem; border-radius:var(--radius-pill); font-size:0.85rem;">
+              <option value="all">All Roles</option>
+              <option value="admin">Operations Admin</option>
+              <option value="superadmin">Super Administrator</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="adminsTable">
+            <thead>
+              <tr>
+                <th style="width:60px;">ID</th>
+                <th>Administrator Details</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Assigned Permissions</th>
+                <th>Created At</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminsTableBody">
+              <tr>
+                <td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">
+                  Loading administrator directory…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: PROVISION / EDIT ADMIN -->
+  <!-- ============================================================== -->
+  <div id="adminModal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width:600px;">
+      <div class="modal-header">
+        <h3 id="modalAdminTitle" class="modal-title">Provision New Administrator</h3>
+        <button id="btnCloseAdminModal" class="modal-close">&times;</button>
+      </div>
+
+      <form id="adminForm">
+        <input type="hidden" id="adminFormId" value="" />
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+          <div class="form-group">
+            <label class="form-label" for="adminName">Full Name *</label>
+            <input type="text" id="adminName" class="form-input" placeholder="e.g. Ramesh Varma" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adminEmail">Corporate Email *</label>
+            <input type="email" id="adminEmail" class="form-input" placeholder="e.g. ramesh@cab.com" required />
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+          <div class="form-group">
+            <label class="form-label" for="adminMobile">Mobile Number *</label>
+            <input type="tel" id="adminMobile" class="form-input" placeholder="10-digit mobile" maxlength="10" required />
+          </div>
+
+          <div class="form-group" id="adminPasswordGroup">
+            <label class="form-label" for="adminPassword">Login Password *</label>
+            <input type="password" id="adminPassword" class="form-input" placeholder="Min. 6 characters" />
+            <span id="passwordHelpText" style="font-size:0.75rem; color:var(--text-muted); display:none; margin-top:2px;">
+              Leave blank to keep current password unchanged
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label">Assigned Permissions & Privileges</label>
+          <div class="modal-checkbox-grid">
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_users" />
+              <span>👥 Passengers</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_drivers" />
+              <span>🚘 Drivers</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_vehicles" />
+              <span>🚙 Fleet</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_trips" />
+              <span>🗺️ Trips</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_fares" />
+              <span>⚡ Fares & Areas</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="view_reports" />
+              <span>📈 Reports</span>
+            </label>
+            <label class="modal-checkbox-label">
+              <input type="checkbox" name="permissions" value="manage_system" />
+              <span>⚙️ System</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="modalAdminAlert" class="alert" style="display:none; margin-bottom:1rem;"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="btnCancelAdminModal" class="btn-secondary">Cancel</button>
+          <button type="submit" id="btnSaveAdmin" class="btn-primary">Save Administrator</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: DELETE CONFIRMATION -->
+  <!-- ============================================================== -->
+  <div id="deleteModal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width:440px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:#EF4444;">⚠️ Delete Administrator</h3>
+        <button id="btnCloseDeleteModal" class="modal-close">&times;</button>
+      </div>
+      <div style="padding:1.25rem 0;">
+        <p id="deleteModalMsg" style="font-size:0.92rem; color:var(--text-dark); line-height:1.5;">
+          Are you sure you want to permanently delete this administrator account?
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btnCancelDelete" class="btn-secondary">Cancel</button>
+        <button type="button" id="btnConfirmDelete" class="btn-danger">Permanently Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/superadmin/manage-admins.js"></script>
+</body>
+</html>

@@ -277,10 +277,10 @@ cab-booking/                          ← project root
 - [x] Driver performance table, CSV export via DOM Blob download
 
 #### Commit 3 — `feat(api+ui): superadmin – admins + permissions`
-- [ ] `GET/POST/PUT/DELETE /api/superadmin/admins`
-- [ ] `PUT /api/superadmin/admins/:id/activate|deactivate`
-- [ ] `GET/POST/DELETE /api/superadmin/permissions/:admin_id`
-- [ ] `manage-admins.html` + `permissions.html`
+- [x] `GET/POST/PUT/DELETE /api/superadmin/admins`
+- [x] `PUT /api/superadmin/admins/:id/activate|deactivate`
+- [x] `GET/POST/DELETE /api/superadmin/permissions/:admin_id`
+- [x] `manage-admins.html` + `permissions.html`
 
 ---
 
