@@ -1,19 +1,16 @@
 // server/db.js
-// MySQL2 connection pool — reads config from .env file
+// TiDB Cloud connection — uses @tidbcloud/serverless (HTTP-based, no TCP/TLS issues)
 
 'use strict';
 
-const mysql = require('mysql2/promise');
-const fs    = require('fs');
-const path  = require('path');
+const { connect } = require('@tidbcloud/serverless');
+const fs   = require('fs');
+const path = require('path');
 
-// ---------- Load .env manually (no dotenv package) ----------
+// ---------- Load .env manually ----------
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) {
-    console.warn('[db] .env file not found — using process.env or defaults');
-    return;
-  }
+  if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, 'utf8').split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
@@ -28,30 +25,57 @@ function loadEnv() {
 
 loadEnv();
 
-// ---------- Create pool ----------
-const isRemoteHost = process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1';
+// ---------- Build connection URL ----------
+const host     = process.env.DB_HOST     || 'localhost';
+const port     = process.env.DB_PORT     || '3306';
+const user     = encodeURIComponent(process.env.DB_USER     || 'root');
+const password = encodeURIComponent(process.env.DB_PASSWORD || '');
+const database = process.env.DB_NAME     || 'cab_booking';
+const isRemote = host !== 'localhost' && host !== '127.0.0.1';
 
-const pool = mysql.createPool({
-  host:               process.env.DB_HOST     || 'localhost',
-  port:               parseInt(process.env.DB_PORT, 10) || 3306,
-  user:               process.env.DB_USER     || 'root',
-  password:           process.env.DB_PASSWORD || '',
-  database:           process.env.DB_NAME     || 'cab_booking',
-  waitForConnections: true,
-  connectionLimit:    10,
-  queueLimit:         0,
-  timezone:           '+00:00',
-  ssl:                isRemoteHost ? { rejectUnauthorized: false } : undefined,
-});
+const connectionUrl = isRemote
+  ? `mysql://${user}:${password}@${host}:${port}/${database}?ssl=true`
+  : `mysql://${user}:${password}@${host}:${port}/${database}`;
 
-// Test connection on startup
-pool.getConnection()
-  .then(conn => {
-    console.log('[db] ✅ MySQL connected — database:', process.env.DB_NAME || 'cab_booking');
-    conn.release();
+// ---------- Create a pool-like wrapper ----------
+// @tidbcloud/serverless creates stateless connections per query,
+// so we wrap it to match the mysql2 pool API used in routes.
+const tidbConn = connect({ url: connectionUrl });
+
+const pool = {
+  // routes call pool.execute(sql, params)
+  execute: (sql, params) => tidbConn.execute(sql, params)
+    .then(result => {
+      // mysql2 returns [rows, fields]; serverless returns { rows, ... }
+      const rows = Array.isArray(result) ? result : (result.rows || result);
+      return [rows];
+    }),
+
+  // routes also call pool.query(sql, params)
+  query: (sql, params) => tidbConn.execute(sql, params)
+    .then(result => {
+      const rows = Array.isArray(result) ? result : (result.rows || result);
+      return [rows];
+    }),
+
+  // some routes use pool.getConnection() pattern
+  getConnection: () => Promise.resolve({
+    execute: (sql, params) => pool.execute(sql, params),
+    query:   (sql, params) => pool.query(sql, params),
+    release: () => {},
+    beginTransaction: () => tidbConn.execute('BEGIN'),
+    commit:           () => tidbConn.execute('COMMIT'),
+    rollback:         () => tidbConn.execute('ROLLBACK'),
+  }),
+};
+
+// ---------- Test on startup ----------
+tidbConn.execute('SELECT 1 AS ok')
+  .then(() => {
+    console.log('[db] ✅ TiDB Cloud connected — database:', database);
   })
   .catch(err => {
-    console.error('[db] ❌ MySQL connection failed:', err.message);
+    console.error('[db] ❌ TiDB Cloud connection failed:', err.message);
   });
 
 module.exports = pool;
