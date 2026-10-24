@@ -5,7 +5,8 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "node server/server.js"
+    "dev": "node server/server.js",
+    "db:setup": "node scripts/migrate.js"
   },
   "dependencies": {
     "dotenv": "^18.0.8",
