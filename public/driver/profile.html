@@ -101,6 +101,7 @@
   </div>
 
   <script src="/js/api.js"></script>
+  <script src="/js/validator.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       const user = window.getCurrentUser ? window.getCurrentUser() : null;
@@ -113,6 +114,14 @@
         window.location.href = '/login.html';
       });
 
+      const nameInput = document.getElementById('profName');
+      const mobileInput = document.getElementById('profMobile');
+      const licenseInput = document.getElementById('profLicense');
+
+      [nameInput, mobileInput, licenseInput].forEach(inp => {
+        inp?.addEventListener('input', () => window.Validator && Validator.clearFieldError(inp));
+      });
+
       let driverId = null;
 
       try {
@@ -120,10 +129,10 @@
         if (res.success && res.profile) {
           const p = res.profile;
           driverId = p.driver_id;
-          document.getElementById('profName').value = p.name || '';
+          nameInput.value = p.name || '';
           document.getElementById('profEmail').value = p.email || '';
-          document.getElementById('profMobile').value = p.mobile || '';
-          document.getElementById('profLicense').value = p.license_no || '';
+          mobileInput.value = p.mobile || '';
+          licenseInput.value = p.license_no || '';
           if (p.rating) {
             document.getElementById('driverRatingVal').textContent = parseFloat(p.rating).toFixed(2);
           }
@@ -181,14 +190,38 @@
 
       document.getElementById('profileForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (window.Validator) {
+          Validator.clearFormErrors(document.getElementById('profileForm'));
+        }
+
+        const nameVal = nameInput.value.trim();
+        const mobileVal = mobileInput.value.trim();
+        const licenseVal = licenseInput.value.trim();
+
+        let hasErr = false;
+        if (window.Validator && !Validator.isRequired(nameVal)) {
+          Validator.showFieldError(nameInput, 'Full name is required.');
+          hasErr = true;
+        }
+        if (window.Validator && !Validator.isValidPhone(mobileVal)) {
+          Validator.showFieldError(mobileInput, 'Enter a valid 10-digit mobile number.');
+          hasErr = true;
+        }
+        if (window.Validator && !Validator.isValidLicense(licenseVal)) {
+          Validator.showFieldError(licenseInput, 'Enter a valid commercial license number.');
+          hasErr = true;
+        }
+
+        if (hasErr) return;
+
         const btn = document.getElementById('saveBtn');
         btn.disabled = true;
         btn.textContent = 'Saving...';
         try {
           const res = await API.put('/api/driver/profile', {
-            name: document.getElementById('profName').value.trim(),
-            mobile: document.getElementById('profMobile').value.trim(),
-            license_no: document.getElementById('profLicense').value.trim(),
+            name: nameVal,
+            mobile: mobileVal,
+            license_no: licenseVal,
           });
           if (res.success) {
             API.toast('Profile updated successfully!', 'success');

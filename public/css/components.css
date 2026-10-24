@@ -806,3 +806,103 @@
 [data-theme="dark"] .btn-secondary:hover {
   background: var(--surface-3);
 }
+
+/* ── Form Validation UI States & Field Messages ─────────────── */
+.form-control.is-invalid,
+input.is-invalid,
+select.is-invalid,
+textarea.is-invalid {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.form-control.is-valid,
+input.is-valid,
+select.is-valid,
+textarea.is-valid {
+  border-color: #10B981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12) !important;
+}
+
+.field-error-msg {
+  color: #DC2626;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+  margin-left: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  animation: fieldErrorFadeIn 0.2s ease-out;
+}
+
+[data-theme="dark"] .field-error-msg {
+  color: #F87171;
+}
+
+@keyframes fieldErrorFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Password Strength Meter */
+.password-meter-wrap {
+  margin-top: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.password-meter-bar {
+  height: 4px;
+  background: var(--surface-2, #E5E7EB);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+
+.password-meter-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  border-radius: var(--radius-pill);
+}
+
+.password-meter-fill.weak   { width: 25%; background: #EF4444; }
+.password-meter-fill.fair   { width: 50%; background: #F59E0B; }
+.password-meter-fill.good   { width: 75%; background: #3B82F6; }
+.password-meter-fill.strong { width: 100%; background: #10B981; }
+
+.password-meter-text {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Network Status Banner */
+.network-status-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #DC2626;
+  color: #FFFFFF;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  z-index: 10005;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.network-status-banner.visible {
+  transform: translateY(0);
+}
+
+.network-status-banner.online {
+  background: #10B981;
+}

@@ -96,6 +96,7 @@
 
   <!-- Scripts -->
   <script src="/js/api.js"></script>
+  <script src="/js/validator.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       // User menu
@@ -106,6 +107,15 @@
       document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionStorage.clear();
         window.location.href = '/login.html';
+      });
+
+      const nameInput = document.getElementById('nameInput');
+      const mobileInput = document.getElementById('mobileInput');
+      const addressInput = document.getElementById('addressInput');
+      const emergencyInput = document.getElementById('emergencyInput');
+
+      [nameInput, mobileInput, emergencyInput].forEach(inp => {
+        inp?.addEventListener('input', () => window.Validator && Validator.clearFieldError(inp));
       });
 
       // Fetch Profile Details
@@ -119,11 +129,11 @@
           const p = res.profile;
           document.getElementById('profileDisplayName').textContent = p.name;
           document.getElementById('profileAvatar').textContent = p.name.charAt(0).toUpperCase();
-          document.getElementById('nameInput').value = p.name || '';
+          nameInput.value = p.name || '';
           document.getElementById('emailInput').value = p.email || '';
-          document.getElementById('mobileInput').value = p.mobile || '';
-          document.getElementById('emergencyInput').value = p.emergency_contact || '';
-          document.getElementById('addressInput').value = p.default_address || '';
+          mobileInput.value = p.mobile || '';
+          emergencyInput.value = p.emergency_contact || '';
+          addressInput.value = p.default_address || '';
         } catch (err) {
           console.error(err);
           API.toast('Network error loading profile', 'error');
@@ -132,16 +142,41 @@
 
       document.getElementById('profileForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (window.Validator) {
+          Validator.clearFormErrors(document.getElementById('profileForm'));
+        }
+
+        const nameVal = nameInput.value.trim();
+        const mobileVal = mobileInput.value.trim();
+        const emergencyVal = emergencyInput.value.trim();
+        const addressVal = addressInput.value.trim();
+
+        let hasErr = false;
+        if (window.Validator && !Validator.isRequired(nameVal)) {
+          Validator.showFieldError(nameInput, 'Full name is required.');
+          hasErr = true;
+        }
+        if (window.Validator && !Validator.isValidPhone(mobileVal)) {
+          Validator.showFieldError(mobileInput, 'Enter a valid 10-digit mobile number.');
+          hasErr = true;
+        }
+        if (emergencyVal && window.Validator && !Validator.isValidPhone(emergencyVal)) {
+          Validator.showFieldError(emergencyInput, 'Emergency contact must be a valid 10-digit mobile number.');
+          hasErr = true;
+        }
+
+        if (hasErr) return;
+
         const saveBtn = document.getElementById('saveProfileBtn');
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
 
         try {
           const payload = {
-            name:              document.getElementById('nameInput').value.trim(),
-            mobile:            document.getElementById('mobileInput').value.trim(),
-            default_address:   document.getElementById('addressInput').value.trim(),
-            emergency_contact: document.getElementById('emergencyInput').value.trim(),
+            name:              nameVal,
+            mobile:            mobileVal,
+            default_address:   addressVal,
+            emergency_contact: emergencyVal,
           };
 
           const res = await API.put('/api/passenger/profile', payload);

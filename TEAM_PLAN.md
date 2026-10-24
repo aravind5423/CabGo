@@ -316,10 +316,10 @@ cab-booking/                          ← project root
 - [x] All pages: `<title>`, meta description, semantic HTML5 elements
 
 #### Commit 2 — `feat(validation): client-side form validation + error handling`
-- [ ] `public/js/validator.js` — email, phone, password strength, required fields
-- [ ] Wire to all forms: register, book, vehicle add, profile edit
-- [ ] Inline server error display via DOM (no `alert()`)
-- [ ] Network error banner + token expiry auto-redirect
+- [x] `public/js/validator.js` — email, phone, password strength, required fields
+- [x] Wire to all forms: register, book, vehicle add, profile edit
+- [x] Inline server error display via DOM (no `alert()`)
+- [x] Network error banner + token expiry auto-redirect
 
 #### Commit 3 — `chore: seed data + README + v1.0.0 tag`
 - [ ] `database/seed.sql`: 1 superadmin, 2 admins, 5 passengers, 5 drivers, 8 vehicles, sample trips/payments/ratings

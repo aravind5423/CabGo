@@ -282,6 +282,7 @@
   </div>
 
   <script src="/js/api.js"></script>
+  <script src="/js/validator.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
       const user = window.getCurrentUser ? window.getCurrentUser() : null;
@@ -417,16 +418,44 @@
       // Add vehicle submit
       document.getElementById('addVehicleForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const regInput = document.getElementById('addRegNo');
+        const modelInput = document.getElementById('addModel');
+        const capInput = document.getElementById('addCapacity');
         const btn = document.getElementById('submitAddBtn');
+
+        if (window.Validator) {
+          Validator.clearFormErrors(document.getElementById('addVehicleForm'));
+        }
+
+        const vNo = regInput.value.trim();
+        const vModel = modelInput.value.trim();
+        const vCap = parseInt(capInput.value, 10);
+
+        let hasErr = false;
+        if (window.Validator && !Validator.isValidVehicleNumber(vNo)) {
+          Validator.showFieldError(regInput, 'Enter a valid license plate (e.g. TN-09-AB-1234).');
+          hasErr = true;
+        }
+        if (window.Validator && !Validator.isRequired(vModel)) {
+          Validator.showFieldError(modelInput, 'Vehicle model is required.');
+          hasErr = true;
+        }
+        if (window.Validator && (!Validator.isValidPositiveNumber(vCap) || vCap > 20)) {
+          Validator.showFieldError(capInput, 'Capacity must be between 1 and 20 seats.');
+          hasErr = true;
+        }
+
+        if (hasErr) return;
+
         btn.disabled = true;
         btn.textContent = 'Saving...';
 
         try {
           const payload = {
-            vehicle_number: document.getElementById('addRegNo').value.trim(),
+            vehicle_number: vNo,
             vehicle_type: document.getElementById('addType').value,
-            model: document.getElementById('addModel').value.trim(),
-            capacity: parseInt(document.getElementById('addCapacity').value, 10),
+            model: vModel,
+            capacity: vCap,
           };
 
           const res = await API.post('/api/driver/vehicles', payload);
