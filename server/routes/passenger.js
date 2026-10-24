@@ -7,6 +7,8 @@ const pool = require('../db');
 const { requireRole } = require('../middleware/auth');
 const { logAction, getClientIp } = require('../middleware/logger');
 const { getRoadDistanceKm, calculateFare } = require('../utils/fareCalculator');
+const sseBroker = require('../sseBroker');
+const telemetry = require('../telemetry');
 
 // Helper to get or ensure passenger_id from user_id
 async function getPassengerId(connOrPool, userId) {
@@ -225,6 +227,19 @@ module.exports = function passengerRoute(router) {
         ip:          getClientIp(req),
       });
 
+      // Broadcast live ride dispatch event to all online drivers
+      sseBroker.broadcastDispatchToAllDrivers('new_ride_request', {
+        request_id:      requestId,
+        passenger_id:    passengerId,
+        passenger_name:  guard.user.name,
+        pickup_location: pickup_location.trim(),
+        destination:     destination.trim(),
+        vehicle_type:    vehicle_type,
+        estimated_fare:  finalFare,
+        status:          'pending',
+        requested_at:    new Date().toISOString(),
+      }, vehicle_type);
+
       req.sendJSON(201, {
         success:        true,
         message:        'Ride booked successfully! Searching for nearby drivers...',
@@ -341,6 +356,26 @@ module.exports = function passengerRoute(router) {
         `UPDATE ride_requests SET status = 'cancelled' WHERE request_id = ?`,
         [requestId]
       );
+
+      // Check for associated trip and notify subscribers
+      try {
+        const [associatedTrips] = await pool.execute(
+          'SELECT trip_id FROM trips WHERE request_id = ? LIMIT 1',
+          [requestId]
+        );
+        if (associatedTrips.length > 0) {
+          const tId = associatedTrips[0].trip_id;
+          sseBroker.broadcastToTrip(tId, 'ride_cancelled', {
+            request_id:   requestId,
+            trip_id:      tId,
+            message:      'Ride was cancelled by the passenger.',
+            cancelled_by: 'passenger',
+          });
+          telemetry.stopTripSimulation(tId);
+        }
+      } catch (streamErr) {
+        console.warn('[rides/cancel] Stream broadcast error:', streamErr.message);
+      }
 
       await logAction({
         userId:      guard.user.user_id,

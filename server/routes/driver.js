@@ -6,6 +6,8 @@
 const pool = require('../db');
 const { requireRole } = require('../middleware/auth');
 const { logAction, getClientIp } = require('../middleware/logger');
+const sseBroker = require('../sseBroker');
+const telemetry = require('../telemetry');
 
 // Helper: resolve driver_id and vehicle_id for a given user_id
 async function getDriverDetails(connOrPool, userId) {
@@ -405,6 +407,24 @@ module.exports = function driverRoute(router) {
         ip:          getClientIp(req),
       });
 
+      // Broadcast ride acceptance to trip subscribers (passenger & driver)
+      try {
+        sseBroker.broadcastToTrip(tripId, 'ride_accepted', {
+          trip_id:        tripId,
+          request_id:     requestId,
+          driver_id:      driver.driver_id,
+          driver_name:    driver.name,
+          driver_mobile:  driver.mobile,
+          driver_rating:  driver.rating,
+          vehicle_number: vehicle.vehicle_number,
+          vehicle_model:  vehicle.model,
+          vehicle_type:   vehicle.vehicle_type,
+          status:         'accepted',
+        });
+      } catch (streamErr) {
+        console.warn('[driver/ride-requests/accept] Broadcast error:', streamErr.message);
+      }
+
       req.sendJSON(200, {
         success:    true,
         message:    'Ride accepted successfully! Head to pickup location.',
@@ -526,6 +546,28 @@ module.exports = function driverRoute(router) {
         ip:          getClientIp(req),
       });
 
+      // Retrieve route landmarks and launch real-time GPS telemetry simulation
+      try {
+        const [tripRows] = await pool.execute(
+          `SELECT t.trip_id, t.distance_km, rr.pickup_location, rr.destination
+           FROM trips t
+           JOIN ride_requests rr ON t.request_id = rr.request_id
+           WHERE t.trip_id = ?`,
+          [tripId]
+        );
+        if (tripRows.length > 0) {
+          const row = tripRows[0];
+          telemetry.startTripSimulation(tripId, row.pickup_location, row.destination, row.distance_km || 8.5);
+        }
+        sseBroker.broadcastToTrip(tripId, 'trip_started', {
+          trip_id:    tripId,
+          status:     'in_progress',
+          start_time: new Date().toISOString(),
+        });
+      } catch (simErr) {
+        console.warn('[driver/trips/start] Telemetry init error:', simErr.message);
+      }
+
       req.sendJSON(200, {
         success: true,
         message: 'Trip started! Drive safely.',
@@ -610,6 +652,20 @@ module.exports = function driverRoute(router) {
         description: `Trip #${tripId} completed. Fare: ₹${actualFare}`,
         ip:          getClientIp(req),
       });
+
+      // Stop simulated telemetry stream and notify trip subscribers
+      try {
+        telemetry.stopTripSimulation(tripId);
+        sseBroker.broadcastToTrip(tripId, 'trip_completed', {
+          trip_id:        tripId,
+          status:         'completed',
+          fare:           actualFare,
+          distance_km:    actualDistance,
+          payment_method: payment_method || 'cash',
+        });
+      } catch (streamErr) {
+        console.warn('[driver/trips/complete] Stream broadcast error:', streamErr.message);
+      }
 
       req.sendJSON(200, {
         success:     true,

@@ -36,6 +36,7 @@ const ratingsRoute   = require('./routes/ratings');
 const paymentsRoute  = require('./routes/payments');
 const adminRoute     = require('./routes/admin');
 const superRoute     = require('./routes/superadmin');
+const streamRoute    = require('./routes/stream');
 
 const router = new Router();
 authRoute(router);
@@ -45,6 +46,7 @@ ratingsRoute(router);
 paymentsRoute(router);
 adminRoute(router);
 superRoute(router);
+streamRoute(router);
 
 // ── MIME types ───────────────────────────────────────────────
 const MIME = {
