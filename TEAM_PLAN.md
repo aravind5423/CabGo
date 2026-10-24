@@ -322,10 +322,10 @@ cab-booking/                          ← project root
 - [x] Network error banner + token expiry auto-redirect
 
 #### Commit 3 — `chore: seed data + README + v1.0.0 tag`
-- [ ] `database/seed.sql`: 1 superadmin, 2 admins, 5 passengers, 5 drivers, 8 vehicles, sample trips/payments/ratings
-- [ ] Final `README.md`: setup steps + test credentials per role
-- [ ] E2E checklist: passenger books → driver accepts → admin reports → superadmin logs
-- [ ] Git tag: `v1.0.0`
+- [x] `database/seed.sql`: 1 superadmin, 2 admins, 5 passengers, 5 drivers, 8 vehicles, sample trips/payments/ratings
+- [x] Final `README.md`: setup steps + test credentials per role
+- [x] E2E checklist: passenger books → driver accepts → admin reports → superadmin logs
+- [x] Git tag: `v1.0.0`
 
 ---
 
@@ -559,4 +559,4 @@ node server/server.js
 
 ---
 
-*Last updated: 2026-10-19 | Day 1 of 10*
+*Last updated: 2026-10-24 | Day 10 of 10 — v1.0.0 Release Complete*
