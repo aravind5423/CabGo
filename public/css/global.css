@@ -78,7 +78,65 @@
   --t-slow: 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Reset & Base ────────────────────────────────────────── */
+/* ── Dark Mode Custom Properties ─────────────────────────── */
+[data-theme="dark"] {
+  /* Canvas & Containers (Obsidian / Slate cyber aesthetic) */
+  --bg-canvas: #0B0E14;
+  --bg-canvas-subtle: #12161F;
+  --bg-card: #151922;
+  --bg-card-subtle: #1C212D;
+  --bg-dark: #07090D;
+  --bg-dark-surface: #0F121A;
+
+  /* Electric Neon Lime / Chartreuse Accent */
+  --accent-lime: #D4F038;
+  --accent-lime-hover: #C4E22A;
+  --accent-lime-glow: rgba(212, 240, 56, 0.4);
+  --accent-lime-subtle: rgba(212, 240, 56, 0.15);
+
+  /* Brand Tokens */
+  --primary: #F0F6FC;
+  --primary-dark: #FFFFFF;
+  --primary-light: #C9D1D9;
+  --primary-glow: rgba(212, 240, 56, 0.25);
+  --accent: #D4F038;
+  --accent-dark: #C4E22A;
+  --accent-light: #E2FA58;
+  --accent-glow: rgba(212, 240, 56, 0.4);
+
+  /* Surface & Borders */
+  --surface: #151922;
+  --surface-2: #1C212D;
+  --surface-3: #262C3A;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-pill: rgba(255, 255, 255, 0.18);
+
+  /* Text Colors */
+  --text: #F0F6FC;
+  --text-dark: #F0F6FC;
+  --text-muted: #9BA3AF;
+  --text-subtle: #6B7280;
+  --text-light: #FFFFFF;
+
+  /* Status Colors */
+  --success: #10B981;
+  --success-light: rgba(16, 185, 129, 0.2);
+  --error: #EF4444;
+  --error-light: rgba(239, 68, 68, 0.2);
+  --warning: #F59E0B;
+  --warning-light: rgba(245, 158, 11, 0.2);
+  --info: #3B82F6;
+  --info-light: rgba(59, 130, 246, 0.2);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-lime: 0 8px 24px rgba(212, 240, 56, 0.25);
+}
 *,
 *::before,
 *::after {
@@ -619,4 +677,98 @@ small {
 .feature-card:hover a,
 .feature-card:hover li {
   color: #111315;
+}
+
+/* ── Dark Mode Element Adjustments ──────────────────────── */
+[data-theme="dark"] .pill-tag {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-color: var(--border-pill);
+}
+
+[data-theme="dark"] .card-pod {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .btn-outline {
+  border-color: var(--border-pill);
+  color: var(--text);
+}
+
+[data-theme="dark"] .btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--text);
+}
+
+[data-theme="dark"] .btn-app {
+  background: var(--surface-2);
+  border-color: var(--border-pill);
+  color: var(--text);
+}
+
+[data-theme="dark"] .btn-app:hover {
+  background: var(--surface-3);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .nav-pill-bar {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .nav-links a {
+  color: var(--text);
+}
+
+[data-theme="dark"] .nav-links a:hover {
+  color: var(--accent-lime);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: var(--accent-lime);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-lime-subtle);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+/* ── Mobile-First Breakpoints & Micro-Utilities ─────────── */
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+  .app-frame {
+    padding: 0.75rem 0.75rem 2.5rem;
+  }
+  .container {
+    padding: 0 0.75rem;
+  }
+  .btn-lg {
+    padding: 0.75rem 1.6rem;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+  .nav-pill-bar {
+    padding: 0.65rem 1rem;
+  }
 }

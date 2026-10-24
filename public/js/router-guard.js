@@ -4,6 +4,13 @@
 // OR:    <script src="/js/router-guard.js" data-role="driver,admin,superadmin"></script>
 
 (function () {
+  // Apply saved or system theme immediately to prevent FOUC (flash of unstyled content)
+  try {
+    const savedTheme = localStorage.getItem('cab_theme') ||
+      (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } catch (e) {}
+
   const scriptTag    = document.currentScript;
   const allowedRoles = (scriptTag?.dataset?.role || '').split(',').map(r => r.trim()).filter(Boolean);
 

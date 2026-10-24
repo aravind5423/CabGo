@@ -308,12 +308,12 @@ cab-booking/                          ← project root
 **Goal**: System fully integrated, polished, seeded, tagged v1.0.0
 
 #### Commit 1 — `feat(ui): global UI polish + responsive design`
-- [ ] Dark mode palette finalized across all pages
-- [ ] Mobile-first responsive breakpoints
-- [ ] Sidebar nav component for all dashboards
-- [ ] Toast notification system (success/error)
-- [ ] Skeleton loaders during Fetch calls
-- [ ] All pages: `<title>`, meta description, semantic HTML5 elements
+- [x] Dark mode palette finalized across all pages
+- [x] Mobile-first responsive breakpoints
+- [x] Sidebar nav component for all dashboards
+- [x] Toast notification system (success/error)
+- [x] Skeleton loaders during Fetch calls
+- [x] All pages: `<title>`, meta description, semantic HTML5 elements
 
 #### Commit 2 — `feat(validation): client-side form validation + error handling`
 - [ ] `public/js/validator.js` — email, phone, password strength, required fields
