@@ -127,15 +127,48 @@
       font-weight: 800;
       font-size: 1.1rem;
       text-transform: capitalize;
-      color: #111315;
+      color: var(--text-dark, #111315);
     }
 
     .ride-fare {
       font-family: var(--font-heading);
       font-size: 1.85rem;
       font-weight: 800;
-      color: #111315;
+      color: var(--text-dark, #111315);
       margin-bottom: 0.2rem;
+    }
+
+    .guaranteed-fare-tag {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-dark, #111315);
+    }
+
+    [data-theme="dark"] .ride-option:not(.selected) {
+      background: var(--surface-2, #1C212D);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+    }
+
+    [data-theme="dark"] .ride-option:not(.selected) .ride-type-name {
+      color: #F0F6FC;
+    }
+
+    [data-theme="dark"] .ride-option:not(.selected) .ride-fare {
+      color: var(--accent-lime, #D9F99D);
+    }
+
+    [data-theme="dark"] .ride-option:not(.selected) .guaranteed-fare-tag {
+      color: #94A3B8;
+    }
+
+    [data-theme="dark"] .ride-option:not(.selected) .ride-type-icon {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .ride-option.selected .ride-type-name,
+    .ride-option.selected .ride-fare,
+    .ride-option.selected .guaranteed-fare-tag {
+      color: #111315 !important;
     }
 
     .book-cta-banner {
@@ -348,7 +381,7 @@
           </div>
           <div class="ride-fare">₹${parseFloat(opt.estimated_fare).toFixed(2)}</div>
           <div style="font-size: 0.8rem; color: #6B7280; margin-bottom: 0.75rem;">Base ₹${parseFloat(opt.base_fare).toFixed(2)} • ₹${parseFloat(opt.per_km_rate).toFixed(2)}/km</div>
-          <div style="font-size: 0.85rem; font-weight: 700; color: #111;">Upfront Guaranteed Fare</div>
+          <div class="guaranteed-fare-tag">Upfront Guaranteed Fare</div>
         </div>
       `).join('');
 

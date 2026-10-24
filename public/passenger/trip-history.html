@@ -10,8 +10,8 @@
   <script src="/js/router-guard.js" data-role="passenger"></script>
   <style>
     .filter-toolbar {
-      background: rgba(30, 41, 59, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 14px;
       padding: 1.25rem;
       margin-bottom: 1.75rem;
@@ -19,6 +19,7 @@
       flex-wrap: wrap;
       align-items: flex-end;
       gap: 1rem;
+      box-shadow: var(--shadow-card);
     }
     .filter-item {
       flex: 1;
@@ -27,9 +28,16 @@
     .filter-item label {
       display: block;
       font-size: 0.8rem;
-      color: #94A3B8;
+      color: var(--text-dark, #1E293B);
       margin-bottom: 0.35rem;
-      font-weight: 500;
+      font-weight: 600;
+    }
+    [data-theme="dark"] .filter-toolbar {
+      background: var(--surface-2, #1C212D);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+    }
+    [data-theme="dark"] .filter-item label {
+      color: #94A3B8;
     }
     /* Modal */
     .receipt-modal-backdrop {
@@ -44,13 +52,19 @@
       padding: 1rem;
     }
     .receipt-modal {
-      background: #1E293B;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
       border-radius: 16px;
       width: 100%;
       max-width: 480px;
       padding: 1.75rem;
       position: relative;
+      color: var(--text-dark, #111);
+    }
+    [data-theme="dark"] .receipt-modal {
+      background: var(--bg-card, #151922);
+      border-color: var(--border, rgba(255, 255, 255, 0.15));
+      color: #F0F6FC;
     }
   </style>
 </head>

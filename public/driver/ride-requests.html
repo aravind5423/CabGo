@@ -53,7 +53,7 @@
       font-family: var(--font-heading);
       font-size: 1.5rem;
       font-weight: 800;
-      color: #111315;
+      color: var(--text-dark, #111315);
     }
     .passenger-row {
       display: flex;
@@ -115,7 +115,64 @@
     .loc-text {
       font-size: 0.95rem;
       font-weight: 700;
-      color: #111315;
+      color: var(--text-dark, #111315);
+    }
+    .requests-filter-bar {
+      background: #FFFFFF;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-card);
+    }
+    .request-empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 1rem;
+      background: #FFFFFF;
+      border-radius: var(--radius-xl);
+      border: 1px dashed rgba(0,0,0,0.1);
+    }
+    .request-empty-state h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-dark, #111);
+      margin-bottom: 0.35rem;
+    }
+    .passenger-name-text {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--text-dark, #111);
+    }
+    [data-theme="dark"] .requests-filter-bar {
+      background: var(--bg-card, #151922);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+    }
+    [data-theme="dark"] .request-card {
+      background: var(--bg-card, #151922);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+    }
+    [data-theme="dark"] .passenger-row {
+      background: var(--surface-2, #1C212D);
+    }
+    [data-theme="dark"] .req-pill {
+      background: rgba(255, 255, 255, 0.08);
+      color: #CBD5E1;
+    }
+    [data-theme="dark"] .point-dot {
+      background: var(--surface-2, #1C212D);
+    }
+    [data-theme="dark"] .req-fare-badge {
+      color: var(--accent-lime, #D9F99D);
+    }
+    [data-theme="dark"] .request-empty-state {
+      background: var(--bg-card, #151922);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
     }
     .radar-pulse-ring {
       width: 12px;
@@ -186,9 +243,9 @@
       </section>
 
       <!-- Filter / Status Bar -->
-      <div style="background: #FFFFFF; border-radius: var(--radius-pill); border: 1px solid rgba(0, 0, 0, 0.06); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-card);">
+      <div class="requests-filter-bar">
         <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-          <span style="font-weight: 700; font-size: 0.9rem; color: #111315;">Duty Status:</span>
+          <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-dark);">Duty Status:</span>
           <span id="dutyIndicator" class="status-badge status-accepted" style="background: #D1FAE5; color: #059669;">ONLINE</span>
           <span id="vehicleTypeBadge" class="req-pill" style="text-transform: uppercase;">Sedan Tier</span>
           <span id="sseDispatchBadge" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 0.25rem 0.75rem; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.3);">
@@ -203,9 +260,9 @@
 
       <!-- Requests Feed Grid -->
       <div id="requestsContainer" class="requests-grid">
-        <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px dashed rgba(0,0,0,0.1);">
+        <div class="request-empty-state">
           <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">📡</span>
-          <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">Scanning your dispatch radius...</h3>
+          <h3>Scanning your dispatch radius...</h3>
           <p style="color: #64748B; font-size: 0.92rem;">Incoming ride requests from nearby passengers will appear here automatically.</p>
         </div>
       </div>
@@ -274,7 +331,7 @@
               <div class="passenger-row">
                 <div class="passenger-avatar">${(r.passenger_name || 'P').charAt(0).toUpperCase()}</div>
                 <div style="flex: 1;">
-                  <div style="font-weight: 800; font-size: 0.95rem; color: #111;">${r.passenger_name || 'Passenger'}</div>
+                  <div class="passenger-name-text">${r.passenger_name || 'Passenger'}</div>
                   <div style="font-size: 0.8rem; color: #64748B;">📞 ${r.passenger_mobile || 'Contact verified'}</div>
                 </div>
                 <span class="status-badge status-pending">Pending</span>
@@ -410,9 +467,9 @@
             dutyIndicator.style.background = '#FEE2E2';
             dutyIndicator.style.color = '#DC2626';
             container.innerHTML = `
-              <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px solid rgba(0,0,0,0.06);">
+              <div class="request-empty-state">
                 <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">🚫</span>
-                <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">You are currently OFFLINE</h3>
+                <h3>You are currently OFFLINE</h3>
                 <p style="color: #64748B; font-size: 0.92rem; margin-bottom: 1.5rem;">Switch your status to Online from the dashboard to start receiving trip offers.</p>
                 <a href="/driver/dashboard.html" class="btn btn-primary btn-sm">Go to Dashboard &rarr;</a>
               </div>
@@ -434,9 +491,9 @@
 
           if (reqs.length === 0) {
             container.innerHTML = `
-              <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; background: #FFFFFF; border-radius: var(--radius-xl); border: 1px dashed rgba(0,0,0,0.1);">
+              <div class="request-empty-state">
                 <span style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem;">📡</span>
-                <h3 style="font-size: 1.25rem; font-weight: 800; color: #111; margin-bottom: 0.35rem;">Scanning your dispatch radius...</h3>
+                <h3>Scanning your dispatch radius...</h3>
                 <p style="color: #64748B; font-size: 0.92rem;">No pending ride requests right now. As soon as a rider books, it will pop up here.</p>
               </div>
             `;

@@ -102,7 +102,13 @@
     .req-fare {
       font-size: 1.15rem;
       font-weight: 800;
-      color: #111315;
+      color: var(--text-dark, #111315);
+    }
+    [data-theme="dark"] .req-fare {
+      color: var(--accent-lime, #D9F99D);
+    }
+    [data-theme="dark"] .payout-banner {
+      background: var(--surface-2, #1C212D) !important;
     }
     .req-locations {
       font-size: 0.9rem;
@@ -274,7 +280,7 @@
               🚕
             </div>
             <div>
-              <div id="vehicleModel" style="font-size: 1.15rem; font-weight: 800; color: #111315;">Honda City</div>
+              <div id="vehicleModel" style="font-size: 1.15rem; font-weight: 800; color: var(--text-dark);">Honda City</div>
               <div id="vehicleNumber" style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: #64748B;">TN-09-AB-1234</div>
             </div>
           </div>
@@ -298,9 +304,9 @@
             </div>
           </div>
 
-          <div style="margin-top: 1.5rem; background: #F7F8F4; border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <div class="payout-banner" style="margin-top: 1.5rem; background: #F7F8F4; border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div style="font-size: 0.85rem; font-weight: 700; color: #111;">Total Lifetime Payout</div>
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-dark);">Total Lifetime Payout</div>
               <div style="font-size: 1.25rem; font-weight: 800; color: #059669;" id="statLifetimeEarnings">₹0.00</div>
             </div>
             <a href="/driver/earnings.html" class="btn btn-primary btn-sm">Payout History</a>

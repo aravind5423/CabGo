@@ -8,6 +8,58 @@
   <link rel="stylesheet" href="/css/global.css" />
   <link rel="stylesheet" href="/css/dashboard.css" />
   <script src="/js/router-guard.js" data-role="driver"></script>
+  <style>
+    .prof-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-dark, #111);
+    }
+    .prof-input {
+      background: #F7F8F4;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.1);
+      color: var(--text-dark, #111);
+    }
+    .prof-input[readonly] {
+      background: #E2E8F0;
+      cursor: not-allowed;
+      color: #64748B;
+    }
+    .review-card-item {
+      background: #F7F8F4;
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+    }
+    .reviewer-name {
+      font-weight: 700;
+      color: var(--text-dark, #111);
+      font-size: 0.95rem;
+    }
+    .review-comment {
+      font-size: 0.9rem;
+      color: #475569;
+      margin-bottom: 0.4rem;
+    }
+    [data-theme="dark"] .prof-input {
+      background: var(--surface-2, #1C212D);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+      color: #F0F6FC;
+    }
+    [data-theme="dark"] .prof-input[readonly] {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+      color: #94A3B8;
+    }
+    [data-theme="dark"] .review-card-item {
+      background: var(--surface-2, #1C212D);
+      border-color: var(--border, rgba(255, 255, 255, 0.1));
+    }
+    [data-theme="dark"] .review-comment {
+      color: #CBD5E1;
+    }
+  </style>
 </head>
 <body class="app-layout">
 
@@ -61,23 +113,23 @@
 
         <form id="profileForm" style="display: flex; flex-direction: column; gap: 1.25rem;">
           <div class="form-group">
-            <label style="font-size: 0.85rem; font-weight: 700; color: #111;">Full Name</label>
-            <input type="text" id="profName" class="form-control" style="background: #F7F8F4; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1);" required />
+            <label class="prof-label">Full Name</label>
+            <input type="text" id="profName" class="form-control prof-input" required />
           </div>
 
           <div class="form-group">
-            <label style="font-size: 0.85rem; font-weight: 700; color: #111;">Email Address (Read-only)</label>
-            <input type="email" id="profEmail" class="form-control" style="background: #E2E8F0; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); cursor: not-allowed;" readonly />
+            <label class="prof-label">Email Address (Read-only)</label>
+            <input type="email" id="profEmail" class="form-control prof-input" readonly />
           </div>
 
           <div class="form-group">
-            <label style="font-size: 0.85rem; font-weight: 700; color: #111;">Mobile Number</label>
-            <input type="tel" id="profMobile" class="form-control" style="background: #F7F8F4; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1);" required />
+            <label class="prof-label">Mobile Number</label>
+            <input type="tel" id="profMobile" class="form-control prof-input" required />
           </div>
 
           <div class="form-group">
-            <label style="font-size: 0.85rem; font-weight: 700; color: #111;">Driver License Number</label>
-            <input type="text" id="profLicense" class="form-control" style="background: #F7F8F4; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1);" required />
+            <label class="prof-label">Driver License Number</label>
+            <input type="text" id="profLicense" class="form-control prof-input" required />
           </div>
 
           <div style="margin-top: 1rem;">
@@ -169,12 +221,12 @@
               const stars = '★'.repeat(r.rating) + '☆'.repeat(Math.max(0, 5 - r.rating));
               const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
               return `
-                <div style="background: #F7F8F4; border: 1px solid rgba(0,0,0,0.06); border-radius: 14px; padding: 1rem 1.25rem;">
+                <div class="review-card-item">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                    <div style="font-weight: 700; color: #111; font-size: 0.95rem;">${r.reviewer_name || 'Passenger'}</div>
+                    <div class="reviewer-name">${r.reviewer_name || 'Passenger'}</div>
                     <div style="color: #F59E0B; font-size: 1rem; letter-spacing: 0.05em;">${stars}</div>
                   </div>
-                  <div style="font-size: 0.9rem; color: #475569; margin-bottom: 0.4rem;">
+                  <div class="review-comment">
                     ${r.comment ? `"${r.comment}"` : '<em style="color: #94A3B8;">No written comment provided.</em>'}
                   </div>
                   <div style="font-size: 0.75rem; color: #94A3B8;">${dateStr}</div>

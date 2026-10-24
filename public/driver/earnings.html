@@ -35,6 +35,10 @@
       background: #111315;
       color: var(--accent-lime);
     }
+    [data-theme="dark"] .filter-tab-btn.active {
+      background: var(--accent-lime);
+      color: #111315;
+    }
     .payment-tag {
       font-size: 0.75rem;
       text-transform: uppercase;
@@ -243,7 +247,7 @@
                 <td style="font-size: 0.85rem; color: #64748B;">${dateStr}</td>
                 <td><strong>${t.passenger_name || 'Passenger'}</strong></td>
                 <td>
-                  <div style="font-size: 0.88rem; font-weight: 700; color: #111;">${t.pickup_location}</div>
+                  <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-dark);">${t.pickup_location}</div>
                   <div style="font-size: 0.8rem; color: #64748B;">&darr; ${t.destination}</div>
                 </td>
                 <td><strong>${t.distance_km || 7.5} km</strong></td>

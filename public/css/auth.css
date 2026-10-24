@@ -112,6 +112,20 @@
 .taxi-route-dot.pickup { background: #10B981; }
 .taxi-route-dot.drop   { background: #EF4444; }
 
+.taxi-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111315;
+  margin-bottom: 0.35rem;
+}
+
+.taxi-card-desc {
+  font-size: 0.85rem;
+  color: #4B5563;
+  line-height: 1.5;
+}
+
 .taxi-fare {
   font-family: var(--font-heading);
   font-size: 1.35rem;
@@ -121,6 +135,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.taxi-fare .fare-tag {
+  color: #111315;
+  font-weight: 800;
 }
 
 /* ── Auth Form Panel (Right: Porcelain Card) ─────────────── */
@@ -302,10 +321,34 @@
   border-color: var(--border, rgba(255, 255, 255, 0.1));
 }
 
+[data-theme="dark"] .taxi-card-title {
+  color: #F0F6FC;
+}
+
+[data-theme="dark"] .taxi-card-desc {
+  color: #94A3B8;
+}
+
 [data-theme="dark"] .taxi-route {
-  color: var(--text);
+  color: #F0F6FC;
 }
 
 [data-theme="dark"] .taxi-fare {
-  color: var(--text);
+  color: #F0F6FC;
+}
+
+[data-theme="dark"] .taxi-fare .fare-tag {
+  color: var(--accent-lime, #D9F99D);
+}
+
+[data-theme="dark"] #form-alert.alert-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #FCA5A5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] #form-alert.alert-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6EE7B7;
+  border-color: rgba(16, 185, 129, 0.35);
 }
