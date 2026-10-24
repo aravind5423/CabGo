@@ -29,9 +29,11 @@ function loadEnv() {
 loadEnv();
 
 // ---------- Create pool ----------
+const isRemoteHost = process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1';
+
 const pool = mysql.createPool({
   host:               process.env.DB_HOST     || 'localhost',
-  port:               process.env.DB_PORT     || 3306,
+  port:               parseInt(process.env.DB_PORT, 10) || 3306,
   user:               process.env.DB_USER     || 'root',
   password:           process.env.DB_PASSWORD || '',
   database:           process.env.DB_NAME     || 'cab_booking',
@@ -39,6 +41,7 @@ const pool = mysql.createPool({
   connectionLimit:    10,
   queueLimit:         0,
   timezone:           '+00:00',
+  ssl:                isRemoteHost ? { rejectUnauthorized: false } : undefined,
 });
 
 // Test connection on startup
