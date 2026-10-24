@@ -156,9 +156,10 @@ const server = http.createServer(async (req, res) => {
 
   // ── API routes ──
   if (pathname.startsWith('/api/')) {
-    // 1. In-memory IP rate limiting
+    // 1. In-memory IP rate limiting (bypass for persistent SSE streams)
     const clientIp = getClientIp(req);
-    const rateCheck = checkRateLimit(clientIp, pathname);
+    const isSSE = pathname.startsWith('/api/stream/');
+    const rateCheck = isSSE ? { allowed: true } : checkRateLimit(clientIp, pathname);
 
     if (!rateCheck.allowed) {
       const retryAfterSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000));
