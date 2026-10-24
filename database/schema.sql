@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS payments (
   trip_id         INT UNSIGNED NOT NULL UNIQUE,
   passenger_id    INT UNSIGNED NOT NULL,
   amount          DECIMAL(8,2) NOT NULL,
-  payment_method  ENUM('cash','card','wallet') NOT NULL DEFAULT 'cash',
+  payment_method  ENUM('cash','card','wallet','upi') NOT NULL DEFAULT 'cash',
   payment_status  ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
   paid_at         DATETIME,
   CONSTRAINT fk_pay_trip      FOREIGN KEY (trip_id)      REFERENCES trips(trip_id),

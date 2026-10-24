@@ -61,6 +61,9 @@ async function run() {
 
     console.log('[migrate] ⚙️  Executing schema (creating tables)...');
     await connection.query(schemaSql);
+    try {
+      await connection.query("ALTER TABLE cab_booking.payments MODIFY COLUMN payment_method ENUM('cash','card','wallet','upi') NOT NULL DEFAULT 'cash'");
+    } catch (_) {}
     console.log('[migrate] ✅ Tables created successfully!');
 
     const seedPath = path.join(__dirname, '..', 'database', 'seed.sql');
