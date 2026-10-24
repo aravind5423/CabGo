@@ -772,3 +772,31 @@ small {
     padding: 0.65rem 1rem;
   }
 }
+
+.cursor-dot {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #111315;
+    pointer-events: none;
+    z-index: 999999;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: background-color 0.2s ease;
+    will-change: left, top;
+}
+
+/* Dark mode: blue dot */
+html[data-theme="dark"] .cursor-dot {
+    background-color: #3B82F6;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .cursor-dot {
+        transition: none;
+    }
+}
