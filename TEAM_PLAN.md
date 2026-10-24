@@ -329,7 +329,29 @@ cab-booking/                          ← project root
 
 ---
 
-## 📊 30-Commit Summary Table
+### ✅ DAY 11 — Real-Time Transit Telemetry with Server-Sent Events (SSE)
+**Goal**: Native Node.js HTTP Server-Sent Events broker, simulated GPS coordinates streaming, and browser EventSource listener with live car sprite animation.
+
+#### Commit 1 — `feat(sse): raw Node.js Server-Sent Events broker`
+- [x] `server/sseBroker.js` — zero-dependency SSE stream initializer (`text/event-stream; charset=utf-8`)
+- [x] Keepalive heartbeat ping interval (15s) and subscriber registries (`tripSubscribers`, `driverSubscribers`, `adminSubscribers`)
+- [x] Stream route bypass in `server/server.js` for persistent SSE sockets
+
+#### Commit 2 — `feat(telemetry): live simulated GPS coordinates stream`
+- [x] `server/telemetry.js` — Chennai landmark coordinates database, bearing calculation, route waypoints generator
+- [x] 2.5s telemetry broadcast simulation pushing `{ lat, lng, bearing, speed_kmh, eta_minutes, progress_percent }`
+- [x] Hooked triggers in `server/routes/passenger.js` (book dispatch, cancel cleanup) and `server/routes/driver.js` (accept, start, complete)
+- [x] `server/routes/stream.js` — endpoints for `/api/stream/trip/:id`, `/api/stream/driver-dispatch`, `/api/stream/admin-live`
+
+#### Commit 3 — `feat(ui): EventSource listener & car sprite animation`
+- [x] `public/passenger/active-trip.html` — live SVG route track, animated glowing car sprite 🚖 with `getPointAtLength` trajectory interpolation
+- [x] Real-time speedometer gauge, ETA calculator, compass bearing ticker, and SSE stream status badge
+- [x] `public/driver/active-trip.html` — live telemetry HUD synchronization and instant passenger cancellation handling
+- [x] `public/driver/ride-requests.html` — SSE dispatch feed with pure Web Audio API synthesizer chime and instant offer card prepending
+
+---
+
+## 📊 Week Roadmap & Commit Summary Table
 
 | Day | Commit 1 | Commit 2 | Commit 3 |
 |-----|----------|----------|----------|
@@ -343,6 +365,7 @@ cab-booking/                          ← project root
 | 8 | Reports + logs APIs | Reports UI (canvas charts) | Super Admin admins + permissions |
 | 9 | Super Admin dashboard + logs UI | System settings UI | Security hardening |
 | 10 | Global UI polish | Form validation + error handling | Seed data + README + v1.0.0 |
+| 11 | Raw Node.js SSE Broker | Simulated GPS Telemetry Stream | EventSource UI & Car Animation |
 
 ---
 
@@ -559,4 +582,4 @@ node server/server.js
 
 ---
 
-*Last updated: 2026-10-24 | Day 10 of 10 — v1.0.0 Release Complete*
+*Last updated: 2026-10-24 | Day 11 Complete — Real-Time SSE Telemetry & Transit Streaming*

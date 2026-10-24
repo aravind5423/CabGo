@@ -107,6 +107,17 @@
       100% { transform: scale(2.4); opacity: 0; }
     }
 
+    /* Car Sprite Animation & Pulse */
+    @keyframes carPulseRing {
+      0% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.4); opacity: 0.15; }
+      100% { transform: scale(1); opacity: 0.8; }
+    }
+    .car-pulse-ring {
+      transform-origin: center;
+      animation: carPulseRing 1.8s ease-in-out infinite;
+    }
+
     /* Star rating widget */
     .star-btn {
       color: #475569;
@@ -200,6 +211,85 @@
             <div class="step-node" id="step4">
               <div class="step-circle">4</div>
               <span class="step-label">Completed</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Telemetry HUD & Animated Transit Track -->
+        <div id="liveTelemetryHud" class="dash-card" style="margin-bottom: 1.5rem; background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; overflow: hidden; position: relative;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span class="active-pulse-badge" id="ssePulseDot" style="background: #10B981; width: 10px; height: 10px;"></span>
+              <div>
+                <div style="font-weight: 700; color: #fff; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <span>🛰️ Real-Time Transit Telemetry</span>
+                  <span id="sseStatusPill" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.3);">CONNECTING</span>
+                </div>
+                <div style="font-size: 0.75rem; color: #94A3B8;" id="telemetryCoords">Lat: 13.0850° N • Lng: 80.2101° E</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 1.25rem; text-align: right;">
+              <div>
+                <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Speed</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #F59E0B;" id="telemetrySpeed">0 <small style="font-size: 0.75rem;">km/h</small></div>
+              </div>
+              <div>
+                <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Est. Arrival</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #10B981;" id="telemetryEta">— <small style="font-size: 0.75rem;">mins</small></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SVG Route Track & Animated Car Sprite -->
+          <div style="position: relative; height: 170px; background: rgba(15, 23, 42, 0.85); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            <svg id="routeTrackSvg" viewBox="0 0 800 160" style="width: 100%; height: 100%; display: block;" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#10B981" />
+                  <stop offset="50%" stop-color="#F59E0B" />
+                  <stop offset="100%" stop-color="#3B82F6" />
+                </linearGradient>
+                <filter id="carGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+              <!-- Background road bed -->
+              <path id="roadBed" d="M 60,80 C 220,20 380,140 540,40 S 700,90 740,80" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="22" stroke-linecap="round" />
+              <path id="roadLine" d="M 60,80 C 220,20 380,140 540,40 S 700,90 740,80" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-dasharray="8 8" stroke-linecap="round" />
+              <!-- Active traversed path -->
+              <path id="routeTraversed" d="M 60,80 C 220,20 380,140 540,40 S 700,90 740,80" fill="none" stroke="url(#routeGradient)" stroke-width="8" stroke-linecap="round" stroke-dasharray="800" stroke-dashoffset="800" style="transition: stroke-dashoffset 0.8s ease;" />
+              <!-- Pickup marker -->
+              <circle cx="60" cy="80" r="10" fill="#10B981" />
+              <circle cx="60" cy="80" r="16" fill="none" stroke="#10B981" stroke-width="2" opacity="0.4" />
+              <text x="60" y="115" text-anchor="middle" fill="#94A3B8" font-size="11" font-weight="600">Pickup</text>
+              <!-- Destination marker -->
+              <circle cx="740" cy="80" r="10" fill="#EF4444" />
+              <circle cx="740" cy="80" r="16" fill="none" stroke="#EF4444" stroke-width="2" opacity="0.4" />
+              <text x="740" y="115" text-anchor="middle" fill="#94A3B8" font-size="11" font-weight="600">Destination</text>
+              <!-- Animated Car Sprite -->
+              <g id="carSprite" transform="translate(60, 80)" style="transition: transform 0.8s cubic-bezier(0.25, 0.1, 0.25, 1); filter: url(#carGlow);">
+                <circle cx="0" cy="0" r="18" fill="#F59E0B" />
+                <circle cx="0" cy="0" r="24" fill="none" stroke="#F59E0B" stroke-width="2" class="car-pulse-ring" />
+                <text x="0" y="5" text-anchor="middle" font-size="14" id="carIcon">🚖</text>
+              </g>
+            </svg>
+          </div>
+
+          <!-- Progress bar & transit stats -->
+          <div style="padding: 1rem 1.5rem; background: rgba(0, 0, 0, 0.2); display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94A3B8; margin-bottom: 0.35rem;">
+                <span>Transit Progress</span>
+                <span id="telemetryProgressText" style="font-weight: 700; color: #F59E0B;">0% Complete</span>
+              </div>
+              <div style="height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 999px; overflow: hidden;">
+                <div id="telemetryProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10B981, #F59E0B); transition: width 0.8s ease;"></div>
+              </div>
+            </div>
+            <div style="font-size: 0.75rem; color: #94A3B8; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🧭 Heading:</span>
+              <strong id="telemetryBearing" style="color: #fff;">0° N</strong>
             </div>
           </div>
         </div>
@@ -383,7 +473,150 @@
       // Extract request_id from URL query or discover active ride
       const urlParams = new URLSearchParams(window.location.search);
       let currentRequestId = urlParams.get('id');
+      let currentTripId = null;
       let pollingTimer = null;
+      let eventSource = null;
+      let sseConnected = false;
+
+      // Telemetry SVG & HUD Elements
+      const roadBed = document.getElementById('roadBed');
+      const roadLength = roadBed ? roadBed.getTotalLength() : 750;
+      const routeTraversed = document.getElementById('routeTraversed');
+      const carSprite = document.getElementById('carSprite');
+      const telemetrySpeed = document.getElementById('telemetrySpeed');
+      const telemetryEta = document.getElementById('telemetryEta');
+      const telemetryCoords = document.getElementById('telemetryCoords');
+      const telemetryProgressBar = document.getElementById('telemetryProgressBar');
+      const telemetryProgressText = document.getElementById('telemetryProgressText');
+      const telemetryBearing = document.getElementById('telemetryBearing');
+      const sseStatusPill = document.getElementById('sseStatusPill');
+      const ssePulseDot = document.getElementById('ssePulseDot');
+      const livePollingBadge = document.getElementById('livePollingBadge');
+
+      function updateTelemetryHUD(data) {
+        if (!data) return;
+        if (data.speed_kmh !== undefined) {
+          telemetrySpeed.innerHTML = `${data.speed_kmh} <small style="font-size: 0.75rem;">km/h</small>`;
+        }
+        if (data.eta_minutes !== undefined) {
+          telemetryEta.innerHTML = `${data.eta_minutes} <small style="font-size: 0.75rem;">mins</small>`;
+        }
+        if (data.lat !== undefined && data.lng !== undefined) {
+          telemetryCoords.textContent = `Lat: ${Number(data.lat).toFixed(4)}° N • Lng: ${Number(data.lng).toFixed(4)}° E`;
+        }
+        const pct = Math.max(0, Math.min(100, data.progress_percent !== undefined ? data.progress_percent : 0));
+        telemetryProgressBar.style.width = `${pct}%`;
+        telemetryProgressText.textContent = `${pct}% Traversed`;
+
+        if (data.bearing !== undefined) {
+          const b = data.bearing;
+          const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+          const dir = dirs[Math.round(b / 45) % 8];
+          telemetryBearing.textContent = `${b}° ${dir}`;
+        }
+
+        // Animate Car Sprite along SVG Road curve
+        if (roadBed && carSprite && routeTraversed) {
+          const dist = (pct / 100) * roadLength;
+          const pt = roadBed.getPointAtLength(dist);
+          carSprite.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+          routeTraversed.style.strokeDashoffset = roadLength * (1 - pct / 100);
+        }
+      }
+
+      function connectSSE(tripId) {
+        if (!tripId) return;
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+
+        const token = sessionStorage.getItem('token') || '';
+        const streamUrl = `/api/stream/trip/${tripId}?token=${encodeURIComponent(token)}`;
+
+        try {
+          eventSource = new EventSource(streamUrl);
+
+          eventSource.onopen = () => {
+            sseConnected = true;
+            sseStatusPill.textContent = 'SSE STREAMING';
+            sseStatusPill.style.background = 'rgba(16, 185, 129, 0.2)';
+            sseStatusPill.style.color = '#10B981';
+            ssePulseDot.style.background = '#10B981';
+            livePollingBadge.innerHTML = `<span class="active-pulse-badge" style="background: #10B981; width: 8px; height: 8px;"></span> Live Telemetry (SSE)`;
+          };
+
+          eventSource.addEventListener('telemetry', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              updateTelemetryHUD(data);
+            } catch (err) {
+              console.warn('[SSE] telemetry parse err', err);
+            }
+          });
+
+          eventSource.addEventListener('trip_status', (e) => {
+            try {
+              const payload = JSON.parse(e.data);
+              if (payload.trip) {
+                renderRideState({
+                  ...payload.trip,
+                  status: payload.trip.trip_status,
+                  trip: payload.trip
+                });
+              }
+            } catch (err) {
+              console.warn('[SSE] trip_status parse err', err);
+            }
+          });
+
+          eventSource.addEventListener('ride_accepted', (e) => {
+            try {
+              API.toast(`Driver accepted your ride!`, 'success');
+              fetchRideStatus();
+            } catch (err) {}
+          });
+
+          eventSource.addEventListener('trip_started', (e) => {
+            try {
+              API.toast(`Trip started! Drive safe.`, 'info');
+              fetchRideStatus();
+            } catch (err) {}
+          });
+
+          eventSource.addEventListener('trip_arrived', (e) => {
+            try {
+              API.toast(`Vehicle has arrived at the destination!`, 'success');
+            } catch (err) {}
+          });
+
+          eventSource.addEventListener('trip_completed', (e) => {
+            try {
+              const payload = JSON.parse(e.data);
+              API.toast(`Trip completed! Final fare: ₹${payload.fare}`, 'success');
+              fetchRideStatus();
+            } catch (err) {}
+          });
+
+          eventSource.addEventListener('ride_cancelled', (e) => {
+            try {
+              API.toast(`Ride was cancelled.`, 'info');
+              fetchRideStatus();
+            } catch (err) {}
+          });
+
+          eventSource.onerror = (err) => {
+            console.warn('[SSE] EventSource reconnecting or fell back...', err);
+            sseConnected = false;
+            sseStatusPill.textContent = 'POLLING BACKUP';
+            sseStatusPill.style.background = 'rgba(245, 158, 11, 0.2)';
+            sseStatusPill.style.color = '#F59E0B';
+            ssePulseDot.style.background = '#F59E0B';
+          };
+        } catch (err) {
+          console.warn('[SSE] EventSource init failed, using polling', err);
+        }
+      }
 
       async function findActiveRide() {
         if (!currentRequestId) {
@@ -421,6 +654,12 @@
           }
 
           renderRideState(res.ride);
+
+          // Connect SSE once trip is established
+          if (res.ride.trip && res.ride.trip.trip_id && (!eventSource || currentTripId !== res.ride.trip.trip_id)) {
+            currentTripId = res.ride.trip.trip_id;
+            connectSSE(currentTripId);
+          }
         } catch (err) {
           console.error('[fetchRideStatus]', err);
         }
@@ -488,6 +727,10 @@
           progress.style.width = '100%';
           completedBox.style.display = 'block';
           stopPolling();
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
 
           if (ride.trip && ride.trip.trip_id) {
             currentTripId = ride.trip.trip_id;
@@ -496,12 +739,15 @@
         } else if (ride.status === 'cancelled') {
           cancelledBox.style.display = 'block';
           stopPolling();
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
         }
       }
 
       // ── Star Rating Logic ────────────────────────────────────
       let selectedRating = 5;
-      let currentTripId = null;
 
       const starButtons = document.querySelectorAll('.star-btn');
       function setStarDisplay(rating) {
@@ -621,7 +867,6 @@
           clearInterval(pollingTimer);
           pollingTimer = null;
         }
-        document.getElementById('livePollingBadge').style.display = 'none';
       }
 
       // Run on page load

@@ -187,13 +187,17 @@
 
       <!-- Filter / Status Bar -->
       <div style="background: #FFFFFF; border-radius: var(--radius-pill); border: 1px solid rgba(0, 0, 0, 0.06); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-card);">
-        <div style="display: flex; align-items: center; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
           <span style="font-weight: 700; font-size: 0.9rem; color: #111315;">Duty Status:</span>
           <span id="dutyIndicator" class="status-badge status-accepted" style="background: #D1FAE5; color: #059669;">ONLINE</span>
           <span id="vehicleTypeBadge" class="req-pill" style="text-transform: uppercase;">Sedan Tier</span>
+          <span id="sseDispatchBadge" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 0.25rem 0.75rem; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.3);">
+            <span class="active-pulse-badge" style="background: #10B981; width: 6px; height: 6px;"></span>
+            SSE Dispatch Live
+          </span>
         </div>
         <div style="font-size: 0.85rem; color: #64748B;">
-          Auto-polling every <strong style="color: #111;">6 seconds</strong> • <span id="requestCountLabel">0 requests found</span>
+          Instant SSE push • <span id="requestCountLabel">0 requests found</span>
         </div>
       </div>
 
@@ -228,6 +232,170 @@
       const countLabel = document.getElementById('requestCountLabel');
       const dutyIndicator = document.getElementById('dutyIndicator');
       const vehicleBadge = document.getElementById('vehicleTypeBadge');
+      const sseBadge = document.getElementById('sseDispatchBadge');
+      let dispatchEventSource = null;
+
+      // Pure HTML5 Web Audio Synthesizer chime for new incoming ride alerts
+      function playDispatchChime() {
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.36);
+        } catch (e) {
+          // Allowed to fail silently if autoplay policy blocks audio
+        }
+      }
+
+      function createRequestCardHtml(r, isNew = false) {
+        return `
+          <div class="request-card" id="card-${r.request_id}" style="${isNew ? 'animation: slideDownPulse 0.6s ease; border-color: #10B981; box-shadow: 0 0 20px rgba(16,185,129,0.25);' : ''}">
+            <div>
+              <div class="req-top-bar">
+                <div class="req-pill">
+                  <span>🚖</span> #${r.request_id} • ${(r.vehicle_type || 'sedan').toUpperCase()}
+                  ${isNew ? '<span style="background: #10B981; color: #fff; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 999px; margin-left: 4px;">NEW!</span>' : ''}
+                </div>
+                <div class="req-fare-badge">
+                  ₹${parseFloat(r.estimated_fare).toFixed(2)}
+                </div>
+              </div>
+
+              <div class="passenger-row">
+                <div class="passenger-avatar">${(r.passenger_name || 'P').charAt(0).toUpperCase()}</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 800; font-size: 0.95rem; color: #111;">${r.passenger_name || 'Passenger'}</div>
+                  <div style="font-size: 0.8rem; color: #64748B;">📞 ${r.passenger_mobile || 'Contact verified'}</div>
+                </div>
+                <span class="status-badge status-pending">Pending</span>
+              </div>
+
+              <div class="route-visual">
+                <span class="point-dot point-pickup"></span>
+                <div>
+                  <div class="loc-label">Pickup Location</div>
+                  <div class="loc-text">${r.pickup_location}</div>
+                </div>
+
+                <span class="point-dot point-dest"></span>
+                <div style="margin-top: 0.75rem;">
+                  <div class="loc-label">Drop Destination</div>
+                  <div class="loc-text">${r.destination}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
+              <button class="btn btn-primary accept-request-btn" data-id="${r.request_id}" style="flex: 1;">
+                ✓ Accept Ride
+              </button>
+              <button class="btn btn-outline decline-request-btn" data-id="${r.request_id}">
+                ✕ Decline
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      function bindCardActions(cardEl) {
+        cardEl.querySelectorAll('.accept-request-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            btn.disabled = true;
+            btn.textContent = 'Accepting...';
+            try {
+              const aRes = await API.put(`/api/driver/ride-requests/${id}/accept`);
+              if (aRes.success) {
+                API.toast('Ride Accepted! Launching active trip navigator...', 'success');
+                setTimeout(() => {
+                  window.location.href = `/driver/active-trip.html?id=${aRes.trip_id}`;
+                }, 600);
+              } else {
+                API.toast(aRes.message || 'Cannot accept ride', 'error');
+                fetchRequests();
+              }
+            } catch (err) {
+              API.toast('Network error accepting request', 'error');
+            }
+          });
+        });
+
+        cardEl.querySelectorAll('.decline-request-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            document.getElementById(`card-${id}`)?.remove();
+            API.put(`/api/driver/ride-requests/${id}/reject`);
+            API.toast('Request declined', 'info');
+          });
+        });
+      }
+
+      function connectDispatchSSE() {
+        if (dispatchEventSource) {
+          dispatchEventSource.close();
+          dispatchEventSource = null;
+        }
+
+        const token = sessionStorage.getItem('token') || '';
+        const streamUrl = `/api/stream/driver-dispatch?token=${encodeURIComponent(token)}`;
+
+        try {
+          dispatchEventSource = new EventSource(streamUrl);
+
+          dispatchEventSource.onopen = () => {
+            if (sseBadge) {
+              sseBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+              sseBadge.style.color = '#10B981';
+              sseBadge.innerHTML = `<span class="active-pulse-badge" style="background: #10B981; width: 6px; height: 6px;"></span> SSE Dispatch Live`;
+            }
+          };
+
+          dispatchEventSource.addEventListener('new_ride_request', (e) => {
+            try {
+              const reqData = JSON.parse(e.data);
+              playDispatchChime();
+              API.toast(`⚡ Instant Ride Offer: ${reqData.pickup_location} → ${reqData.destination}`, 'success');
+
+              // If placeholder view is present, clear it
+              if (container.querySelector('div[style*="grid-column: 1 / -1"]')) {
+                container.innerHTML = '';
+              }
+
+              // Check if card already exists
+              if (!document.getElementById(`card-${reqData.request_id}`)) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = createRequestCardHtml(reqData, true);
+                const cardEl = tempDiv.firstElementChild;
+                container.prepend(cardEl);
+                bindCardActions(cardEl);
+                countLabel.textContent = `${container.querySelectorAll('.request-card').length} requests available`;
+              }
+            } catch (err) {
+              console.warn('[SSE Dispatch] Parse error:', err);
+            }
+          });
+
+          dispatchEventSource.onerror = () => {
+            if (sseBadge) {
+              sseBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+              sseBadge.style.color = '#F59E0B';
+              sseBadge.innerHTML = `<span class="active-pulse-badge" style="background: #F59E0B; width: 6px; height: 6px;"></span> Polling Backup`;
+            }
+          };
+        } catch (err) {
+          console.warn('[SSE Dispatch] Connect error:', err);
+        }
+      }
 
       async function fetchRequests() {
         try {
@@ -275,93 +443,17 @@
             return;
           }
 
-          container.innerHTML = reqs.map(r => `
-            <div class="request-card" id="card-${r.request_id}">
-              <div>
-                <div class="req-top-bar">
-                  <div class="req-pill">
-                    <span>🚖</span> #${r.request_id} • ${r.vehicle_type.toUpperCase()}
-                  </div>
-                  <div class="req-fare-badge">
-                    ₹${parseFloat(r.estimated_fare).toFixed(2)}
-                  </div>
-                </div>
-
-                <div class="passenger-row">
-                  <div class="passenger-avatar">${(r.passenger_name || 'P').charAt(0).toUpperCase()}</div>
-                  <div style="flex: 1;">
-                    <div style="font-weight: 800; font-size: 0.95rem; color: #111;">${r.passenger_name || 'Passenger'}</div>
-                    <div style="font-size: 0.8rem; color: #64748B;">📞 ${r.passenger_mobile || 'Contact verified'}</div>
-                  </div>
-                  <span class="status-badge status-pending">Pending</span>
-                </div>
-
-                <div class="route-visual">
-                  <span class="point-dot point-pickup"></span>
-                  <div>
-                    <div class="loc-label">Pickup Location</div>
-                    <div class="loc-text">${r.pickup_location}</div>
-                  </div>
-
-                  <span class="point-dot point-dest"></span>
-                  <div style="margin-top: 0.75rem;">
-                    <div class="loc-label">Drop Destination</div>
-                    <div class="loc-text">${r.destination}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display: flex; gap: 0.75rem; margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 1rem;">
-                <button class="btn btn-primary accept-request-btn" data-id="${r.request_id}" style="flex: 1;">
-                  ✓ Accept Ride
-                </button>
-                <button class="btn btn-outline decline-request-btn" data-id="${r.request_id}">
-                  ✕ Decline
-                </button>
-              </div>
-            </div>
-          `).join('');
-
-          // Bind Accept
-          document.querySelectorAll('.accept-request-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const id = btn.dataset.id;
-              btn.disabled = true;
-              btn.textContent = 'Accepting...';
-              try {
-                const aRes = await API.put(`/api/driver/ride-requests/${id}/accept`);
-                if (aRes.success) {
-                  API.toast('Ride Accepted! Launching active trip navigator...', 'success');
-                  setTimeout(() => {
-                    window.location.href = `/driver/active-trip.html?id=${aRes.trip_id}`;
-                  }, 600);
-                } else {
-                  API.toast(aRes.message || 'Cannot accept ride', 'error');
-                  fetchRequests();
-                }
-              } catch (err) {
-                API.toast('Network error accepting request', 'error');
-              }
-            });
-          });
-
-          // Bind Decline
-          document.querySelectorAll('.decline-request-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-              const id = btn.dataset.id;
-              document.getElementById(`card-${id}`)?.remove();
-              API.put(`/api/driver/ride-requests/${id}/reject`);
-              API.toast('Request declined', 'info');
-            });
-          });
+          container.innerHTML = reqs.map(r => createRequestCardHtml(r)).join('');
+          bindCardActions(container);
 
         } catch (err) {
           console.warn('[requests] error:', err);
         }
       }
 
-      fetchRequests();
-      setInterval(fetchRequests, 6000);
+      await fetchRequests();
+      connectDispatchSSE();
+      setInterval(fetchRequests, 8000);
 
       document.getElementById('manualRefreshBtn').addEventListener('click', () => {
         API.toast('Checking for new requests...', 'info');

@@ -270,8 +270,14 @@
         <div class="telemetry-box">
           <div class="telemetry-header">
             <div>
-              <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-lime); font-weight: 700;">Live Trip Telemetry</div>
-              <div style="font-size: 1.3rem; font-weight: 800; margin-top: 0.2rem;" id="telemetryTripId">Trip #—</div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.3rem;">
+                <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-lime); font-weight: 700;">Live Trip Telemetry</span>
+                <span id="sseDriverBadge" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                  <span class="active-pulse-badge" style="background: #10B981; width: 6px; height: 6px;"></span>
+                  SSE Connected
+                </span>
+              </div>
+              <div style="font-size: 1.3rem; font-weight: 800;" id="telemetryTripId">Trip #—</div>
             </div>
             <span class="status-badge" id="telemetryStatusBadge" style="background: var(--accent-lime); color: #111315; font-size: 0.85rem; font-weight: 800; padding: 0.4rem 0.9rem;">
               ACCEPTED
@@ -290,6 +296,14 @@
             <div class="telemetry-item">
               <h4>Elapsed Time</h4>
               <p class="telemetry-val" id="valTimer">00:00</p>
+            </div>
+            <div class="telemetry-item">
+              <h4>GPS Speed</h4>
+              <p class="telemetry-val" id="valSpeed" style="color: var(--accent-lime);">0 km/h</p>
+            </div>
+            <div class="telemetry-item">
+              <h4>Route ETA</h4>
+              <p class="telemetry-val" id="valEta" style="color: #60A5FA;">— mins</p>
             </div>
             <div class="telemetry-item">
               <h4>Assigned Cab</h4>
@@ -418,6 +432,64 @@
         }, 1000);
       }
 
+      let driverEventSource = null;
+      let connectedTripId = null;
+
+      function connectDriverSSE(tripId) {
+        if (!tripId || connectedTripId === tripId) return;
+        if (driverEventSource) {
+          driverEventSource.close();
+          driverEventSource = null;
+        }
+
+        const token = sessionStorage.getItem('token') || '';
+        const streamUrl = `/api/stream/trip/${tripId}?token=${encodeURIComponent(token)}`;
+
+        try {
+          driverEventSource = new EventSource(streamUrl);
+          connectedTripId = tripId;
+
+          driverEventSource.onopen = () => {
+            const badge = document.getElementById('sseDriverBadge');
+            if (badge) {
+              badge.style.background = 'rgba(16, 185, 129, 0.2)';
+              badge.style.color = '#10B981';
+              badge.innerHTML = `<span class="active-pulse-badge" style="background: #10B981; width: 6px; height: 6px;"></span> SSE Connected`;
+            }
+          };
+
+          driverEventSource.addEventListener('telemetry', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.speed_kmh !== undefined) {
+                document.getElementById('valSpeed').textContent = `${data.speed_kmh} km/h`;
+              }
+              if (data.eta_minutes !== undefined) {
+                document.getElementById('valEta').textContent = `${data.eta_minutes} mins`;
+              }
+            } catch (err) {}
+          });
+
+          driverEventSource.addEventListener('ride_cancelled', (e) => {
+            API.toast('Passenger has cancelled this ride request!', 'error');
+            setTimeout(() => {
+              window.location.href = '/driver/ride-requests.html';
+            }, 1500);
+          });
+
+          driverEventSource.onerror = () => {
+            const badge = document.getElementById('sseDriverBadge');
+            if (badge) {
+              badge.style.background = 'rgba(245, 158, 11, 0.2)';
+              badge.style.color = '#F59E0B';
+              badge.innerHTML = `<span class="active-pulse-badge" style="background: #F59E0B; width: 6px; height: 6px;"></span> Polling Active`;
+            }
+          };
+        } catch (err) {
+          console.warn('[Driver SSE] Init error:', err);
+        }
+      }
+
       // Load active trip
       async function loadActiveTrip() {
         try {
@@ -431,12 +503,20 @@
             empty.style.display = 'block';
             activeView.style.display = 'none';
             if (timerInterval) clearInterval(timerInterval);
+            if (driverEventSource) {
+              driverEventSource.close();
+              driverEventSource = null;
+              connectedTripId = null;
+            }
             return;
           }
 
           currentTrip = trip;
           empty.style.display = 'none';
           activeView.style.display = 'block';
+
+          // Initialize SSE stream for live telemetry synchronization
+          connectDriverSSE(trip.trip_id);
 
           // Bind details
           document.getElementById('telemetryTripId').textContent = `Trip #${trip.trip_id} (Booking #${trip.request_id})`;
