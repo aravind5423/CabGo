@@ -33,9 +33,9 @@ const password = encodeURIComponent(process.env.DB_PASSWORD || '');
 const database = process.env.DB_NAME     || 'cab_booking';
 const isRemote = host !== 'localhost' && host !== '127.0.0.1';
 
-const connectionUrl = isRemote
+const connectionUrl = process.env.DATABASE_URL || (isRemote
   ? `mysql://${user}:${password}@${host}:${port}/${database}?ssl=true`
-  : `mysql://${user}:${password}@${host}:${port}/${database}`;
+  : `mysql://${user}:${password}@${host}:${port}/${database}`);
 
 // ---------- Create a pool-like wrapper ----------
 // @tidbcloud/serverless creates stateless connections per query,

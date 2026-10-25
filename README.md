@@ -22,7 +22,7 @@ It features 4 distinct role-based portals:
 
 ### 1. Prerequisites
 - **Node.js**: v18.0.0 or higher
-- **MySQL**: v8.0 or higher
+- **MySQL**: v8.0 or higher (Local MySQL or TiDB Cloud Serverless)
 
 ### 2. Clone and Install Dependencies
 ```bash
@@ -30,14 +30,14 @@ git clone <repository-url>
 cd cab-booking
 npm install
 ```
-*(Only `mysql2` is installed for raw SQL pooling; zero web frameworks or UI libraries).*
+*(Uses raw SQL pooling via `mysql2` and `@tidbcloud/serverless`; zero heavy web frameworks or UI libraries).*
 
 ### 3. Environment Configuration
 Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-Update your MySQL credentials in `.env`:
+Update your database credentials in `.env`:
 ```ini
 DB_HOST=localhost
 DB_PORT=3306
@@ -45,11 +45,21 @@ DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=cab_booking
 
+# Optional: direct TiDB or cloud database connection URL
+# DATABASE_URL=mysql://<user>:<password>@<host>:<port>/<database>?ssl=true
+
 SERVER_PORT=5000
 TOKEN_SECRET=your_super_secret_hmac_key_min_32_chars
 ```
 
 ### 4. Database Setup & Seeding
+
+**Option A — TiDB Cloud / Serverless (Automated):**
+```bash
+npm run db:setup
+```
+
+**Option B — Local MySQL:**
 ```bash
 mysql -u root -p < database/schema.sql
 mysql -u root -p < database/seed.sql

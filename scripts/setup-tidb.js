@@ -5,11 +5,39 @@
 const { connect } = require('@tidbcloud/serverless');
 const fs = require('fs');
 const path = require('path');
+// ---------- Load .env manually ----------
+function loadEnv() {
+  const envPath = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
 
-const URL = 'mysql://XGZSBkh6bGvYCD8.root:QZyHLSaBDOQ87LRV@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/cab_booking?ssl=true';
+loadEnv();
+
+// ---------- Build connection URL ----------
+const host     = process.env.DB_HOST     || 'localhost';
+const port     = process.env.DB_PORT     || '3306';
+const user     = encodeURIComponent(process.env.DB_USER     || 'root');
+const password = encodeURIComponent(process.env.DB_PASSWORD || '');
+const database = process.env.DB_NAME     || 'cab_booking';
+const isRemote = host !== 'localhost' && host !== '127.0.0.1';
+
+const connectionUrl = process.env.DATABASE_URL || (isRemote
+  ? `mysql://${user}:${password}@${host}:${port}/${database}?ssl=true`
+  : `mysql://${user}:${password}@${host}:${port}/${database}`);
 
 async function runSchema() {
-  const conn = connect({ url: URL });
+  console.log(`[setup] Connecting to ${isRemote ? 'cloud database' : 'database'} (${database} on ${host})...`);
+  const conn = connect({ url: connectionUrl });
 
   const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
   let sql = fs.readFileSync(schemaPath, 'utf8');
