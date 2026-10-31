@@ -1,4 +1,4 @@
-# 🚖 CabGo — Modern Multi-Tenant Urban Transit & Dispatch Platform
+# 🚖 Rydio — Modern Multi-Tenant Urban Transit & Dispatch Platform
 
 > **Modern Enterprise Architecture**: React 19 SPA · Node.js & Express.js · Socket.IO Real-Time Engine · Leaflet GIS Maps · MySQL / TiDB Cloud Serverless  
 > **Strict Language Standard**: Pure Modern JavaScript (ES Modules, JSX) — Zero TypeScript compilation overhead.
@@ -7,7 +7,7 @@
 
 ## 🌟 Platform Highlights
 
-**CabGo** is a full-featured, multi-tenant urban transit dispatch and cab booking platform engineered with pure modern JavaScript across both client and server tiers.
+**Rydio** is a full-featured, multi-tenant urban transit dispatch and cab booking platform engineered with pure modern JavaScript across both client and server tiers.
 
 - **4 Specialized Portals**: Dedicated workspaces for Passengers, Driver Partners, Operations Admins, and Super Administrators.
 - **Race-Condition Free Dispatch**: Atomic Compare-and-Swap SQL queries (`UPDATE ... WHERE request_id = ? AND status = 'pending'`) eliminate double-booking edge cases under high concurrent driver loads.

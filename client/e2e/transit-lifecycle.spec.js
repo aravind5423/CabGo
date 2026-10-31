@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('CabGo Urban Transit End-to-End Modern SPA Lifecycle', () => {
+test.describe('Rydio Urban Transit End-to-End Modern SPA Lifecycle', () => {
 
   test('1. Authentication Portal - 1-Click Demo Login and Role Redirection', async ({ page }) => {
     await page.goto('/login');
 
     // Verify title and brand header
-    await expect(page.locator('h1')).toContainText('CabGo');
+    await expect(page.locator('h1')).toContainText('Rydio');
 
     // Test 1-click Passenger Demo Button
     const passengerDemoBtn = page.getByRole('button', { name: /Passenger/i }).first();

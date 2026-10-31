@@ -8,8 +8,8 @@ import LeafletMap from '../../components/map/LeafletMap';
 import AppShell from '../../components/ui/AppShell';
 import { KPICard, StatusBadge, EmptyState, Skeleton, Toast } from '../../components/ui/UIKit';
 import {
-  Power, CheckCircle, XCircle, MapPin, Clock, DollarSign, Loader2,
-  Navigation, Car, Award, ShieldCheck, Play, Flag, Wifi
+  Power, CheckCircle2, XCircle, MapPin, Clock, DollarSign, Loader2,
+  Navigation, Car, Award, ShieldCheck, Play, Flag, Wifi, Radio, ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -49,7 +49,7 @@ export default function DriverDashboard() {
     mutationFn: (newStatus) =>
       api.put('/driver/availability', { availability: newStatus ? 'online' : 'offline', is_available: newStatus }),
     onSuccess: (_, newStatus) => {
-      showToast(newStatus ? 'You are now Online — accepting rides' : 'You went Offline');
+      showToast(newStatus ? 'Radar Online — Receiving ride dispatch requests' : 'Went Offline');
       queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
       queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
     },
@@ -58,30 +58,47 @@ export default function DriverDashboard() {
 
   const acceptMutation = useMutation({
     mutationFn: (id) => api.put(`/driver/ride-requests/${id}/accept`),
-    onSuccess: () => { showToast('Ride accepted!'); queryClient.invalidateQueries({ queryKey: ['driverDashboard'] }); queryClient.invalidateQueries({ queryKey: ['rideRequests'] }); },
+    onSuccess: () => {
+      showToast('Ride accepted! Route loaded onto HUD.');
+      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
+    },
     onError: (err) => showToast(err.response?.data?.message || 'Failed to accept ride.'),
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id) => api.put(`/driver/ride-requests/${id}/reject`),
-    onSuccess: () => { showToast('Ride rejected.'); queryClient.invalidateQueries({ queryKey: ['rideRequests'] }); },
+    onSuccess: () => {
+      showToast('Ride declined.');
+      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
+    },
   });
 
   const startTripMutation = useMutation({
     mutationFn: (tripId) => api.put(`/driver/trips/${tripId}/start`),
-    onSuccess: () => { showToast('Trip started! Drive safely.'); queryClient.invalidateQueries({ queryKey: ['driverDashboard'] }); },
+    onSuccess: () => {
+      showToast('Trip started! Driving towards destination.');
+      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
+    },
     onError: (err) => showToast(err.response?.data?.message || 'Failed to start trip.'),
   });
 
   const completeTripMutation = useMutation({
     mutationFn: (tripId) => api.put(`/driver/trips/${tripId}/complete`, {}),
-    onSuccess: () => { showToast('Trip completed! Fare settled.'); queryClient.invalidateQueries({ queryKey: ['driverDashboard'] }); queryClient.invalidateQueries({ queryKey: ['rideRequests'] }); },
+    onSuccess: () => {
+      showToast('Trip successfully completed! Earnings credited.');
+      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
+    },
     onError: (err) => showToast(err.response?.data?.message || 'Failed to complete trip.'),
   });
 
-  // GPS & Socket
+  // GPS & Socket heartbeat
   useEffect(() => {
-    if (!isOnline) { socket.disconnect(); return; }
+    if (!isOnline) {
+      socket.disconnect();
+      return;
+    }
     socket.connect();
     if (!driverLocation) setDriverLocation([13.0827, 80.2707]);
     let geoWatch;
@@ -103,137 +120,168 @@ export default function DriverDashboard() {
       socket.disconnect();
       if (geoWatch !== undefined) navigator.geolocation.clearWatch(geoWatch);
     };
-  }, [isOnline, activeTrip?.trip_id]);
+  }, [isOnline, activeTrip?.trip_id, setDriverLocation, driverLocation]);
 
   const activeTripId = activeTrip?.trip_id || activeTrip?.request?.trip_id;
   const activeTripStatus = activeTrip?.trip_status || activeTrip?.request?.trip_status || 'accepted';
 
   return (
     <AppShell
-      title="Driver Dashboard"
+      title="Driver Partner Cockpit"
       subtitle={
-        <span className={clsx('flex items-center gap-1.5 text-xs font-medium', isOnline ? 'text-success' : 'text-ink-muted')}>
-          <span className={clsx('w-1.5 h-1.5 rounded-full', isOnline ? 'bg-success animate-pulse' : 'bg-ink-faint')} />
-          {isOnline ? 'Online — Accepting rides' : 'Offline'}
+        <span className={clsx('flex items-center gap-2 text-xs font-bold', isOnline ? 'text-emerald-600' : 'text-slate-500')}>
+          <span className={clsx('w-2 h-2 rounded-full', isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400')} />
+          {isOnline ? 'System Online — Accepting dispatch requests' : 'System Offline — Standby mode'}
         </span>
       }
     >
       <Toast message={toastMsg} />
 
-      <div className="space-y-5 animate-fade-in">
-        {/* Top Bar: Toggle + Stats */}
+      <div className="space-y-6">
+        {/* Cockpit Top Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Availability Toggle */}
-          <div className={clsx(
-            'card-sm p-5 flex flex-col gap-4',
-            isOnline ? 'border-success/30 bg-success-bg/30' : 'border-line'
-          )}>
+          <div
+            className={clsx(
+              'card p-5 flex flex-col justify-between transition-all duration-300 relative overflow-hidden',
+              isOnline
+                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                : 'bg-white border-slate-200'
+            )}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Availability</div>
-                <div className={clsx('text-sm font-bold', isOnline ? 'text-success' : 'text-ink-muted')}>
-                  {isOnline ? 'Online' : 'Offline'}
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Radar</span>
+                <div className={clsx('text-base font-extrabold mt-0.5', isOnline ? 'text-emerald-700' : 'text-slate-600')}>
+                  {isOnline ? 'Online (Beacon Active)' : 'Offline (Paused)'}
                 </div>
               </div>
-              <Power size={20} className={isOnline ? 'text-success' : 'text-ink-faint'} />
+              <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center shadow-sm', isOnline ? 'bg-emerald-500 text-white shadow-emerald-500/30' : 'bg-slate-100 text-slate-400')}>
+                <Power size={20} />
+              </div>
             </div>
+
             <button
               onClick={() => availabilityMutation.mutate(!isOnline)}
               disabled={availabilityMutation.isPending}
               className={clsx(
-                'w-full py-2 rounded-xl text-sm font-semibold transition',
+                'w-full py-2.5 rounded-xl text-xs font-bold transition-all mt-4 cursor-pointer shadow-sm',
                 isOnline
-                  ? 'bg-error-bg text-error border border-error/20 hover:bg-error/10'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
                   : 'btn-primary'
               )}
             >
-              {availabilityMutation.isPending
-                ? <Loader2 size={14} className="animate-spin mx-auto" />
-                : isOnline ? 'Go Offline' : 'Go Online'
-              }
+              {availabilityMutation.isPending ? (
+                <Loader2 size={15} className="animate-spin mx-auto" />
+              ) : isOnline ? (
+                'Switch to Offline'
+              ) : (
+                'Go Live & Online'
+              )}
             </button>
           </div>
 
-          {/* KPIs */}
+          {/* KPI Cards */}
           {isDashboardLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="card-sm p-5 space-y-3">
+              <div key={i} className="card p-5 space-y-3">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-8 w-16" />
               </div>
             ))
           ) : (
             <>
-              <KPICard label="Total Trips"    value={stats.total_trips ?? 0}    icon={Car}         iconClass="text-info" />
-              <KPICard label="Today's Trips"  value={stats.today_trips ?? 0}    icon={Navigation}  iconClass="text-brand" />
-              <KPICard label="Total Earnings" value={`₹${stats.total_earnings ?? 0}`} icon={DollarSign} iconClass="text-brand" accentBg />
+              <KPICard
+                label="Total Trips"
+                value={stats.total_trips ?? 0}
+                icon={Car}
+                gradient="linear-gradient(135deg,#3B82F6,#1D4ED8)"
+              />
+              <KPICard
+                label="Today's Trips"
+                value={stats.today_trips ?? 0}
+                icon={Navigation}
+                gradient="linear-gradient(135deg,#F59E0B,#D97706)"
+              />
+              <KPICard
+                label="Total Earnings"
+                value={`₹${stats.total_earnings ?? 0}`}
+                icon={DollarSign}
+                gradient="linear-gradient(135deg,#16A34A,#15803D)"
+                accentBg
+              />
             </>
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Left Column: Vehicle & Active Trip */}
+        {/* Content Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Driver Credentials Sidebar */}
           <div className="space-y-4">
             {/* Vehicle Card */}
             {vehicle?.vehicle_number && (
-              <div className="card-sm p-4">
-                <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">My Vehicle</div>
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center text-xl flex-shrink-0">
-                    🚗
+              <div className="card p-5 space-y-3 bg-gradient-to-br from-white to-slate-50">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Fleet Assigned</div>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center text-2xl flex-shrink-0">
+                    🚘
                   </div>
-                  <div>
-                    <div className="font-bold text-ink text-sm tracking-wider font-mono uppercase">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono font-black text-slate-900 text-sm tracking-wider uppercase">
                       {vehicle.vehicle_number}
                     </div>
-                    <div className="text-xs text-ink-muted mt-0.5 capitalize">
-                      {vehicle.model} · {vehicle.vehicle_type} · {vehicle.capacity || 4} seats
+                    <div className="text-xs text-slate-500 capitalize mt-0.5">
+                      {vehicle.model} • {vehicle.vehicle_type}
+                    </div>
+                    <div className="text-[11px] text-emerald-600 font-bold mt-1">
+                      {vehicle.capacity || 4} Passenger Capacity
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Driver Profile */}
-            <div className="card-sm p-4 space-y-3">
-              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Profile</div>
+            {/* Profile & Rating */}
+            <div className="card p-5 space-y-3">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Partner Profile</div>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-brand-light flex items-center justify-center font-bold text-brand flex-shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white font-black text-lg flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
                   {user?.name?.[0]?.toUpperCase() || 'D'}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-ink">{user?.name}</div>
-                  <span className="badge bg-success-bg text-success text-[11px]">
-                    <ShieldCheck size={11} className="inline mr-0.5" /> Verified Partner
-                  </span>
+                  <div className="text-sm font-bold text-slate-900">{user?.name}</div>
+                  <div className="badge bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold mt-0.5">
+                    <ShieldCheck size={11} className="inline mr-1" /> Approved Commercial Driver
+                  </div>
                 </div>
               </div>
-              {driver.avg_rating && (
-                <div className="flex items-center gap-1.5 pt-2 border-t border-line">
-                  <Award size={14} className="text-warning" />
-                  <span className="text-sm font-semibold text-ink">{driver.avg_rating}</span>
-                  <span className="text-xs text-ink-muted">avg rating</span>
-                </div>
-              )}
+
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Partner Rating</span>
+                <span className="font-bold text-amber-500 flex items-center gap-1">
+                  <Award size={14} /> {driver.rating || '4.95'} / 5.0
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right: Active Trip / Requests */}
-          <div className="lg:col-span-2 space-y-4">
-
-            {/* Active Trip Control */}
+          {/* Center Main: Active Trip / Incoming Stream */}
+          <div className="lg:col-span-2 space-y-5">
+            {/* Active Trip HUD */}
             {activeTrip && (
-              <div className="card overflow-hidden border-brand/20">
-                <div className="px-5 py-4 border-b border-line bg-brand-50 flex items-center justify-between">
+              <div className="card overflow-hidden border-emerald-500/40 shadow-xl">
+                <div className="p-4 bg-emerald-50/80 border-b border-emerald-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-                    <span className="text-sm font-semibold text-brand">Active Trip #{activeTripId}</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                      Live Trip #{activeTripId} Active
+                    </span>
                   </div>
                   <StatusBadge status={activeTripStatus} />
                 </div>
 
                 {/* Map */}
-                <div className="h-52">
+                <div className="h-60 w-full">
                   <LeafletMap
                     pickupCoords={activeTrip.pickup_location}
                     dropCoords={activeTrip.destination}
@@ -243,45 +291,48 @@ export default function DriverDashboard() {
                   />
                 </div>
 
-                <div className="p-5 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <MapPin size={15} className="text-success mt-0.5 flex-shrink-0" />
+                <div className="p-5 space-y-3.5">
+                  <div className="flex items-start gap-3">
+                    <MapPin size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-[11px] text-ink-muted">Pickup</div>
-                      <div className="text-sm font-medium text-ink">{activeTrip.pickup_location}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Pickup Location</div>
+                      <div className="text-xs font-bold text-slate-900">{activeTrip.pickup_location}</div>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <Navigation size={15} className="text-error mt-0.5 flex-shrink-0" />
-                    <div>
-                      <div className="text-[11px] text-ink-muted">Destination</div>
-                      <div className="text-sm font-medium text-ink">{activeTrip.destination}</div>
-                    </div>
-                  </div>
-                  <div className="pt-3 border-t border-line flex items-center justify-between">
-                    <span className="text-xs text-ink-muted">Fare</span>
-                    <span className="text-lg font-bold text-ink">₹{activeTrip.estimated_fare || activeTrip.fare || '—'}</span>
                   </div>
 
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex items-start gap-3">
+                    <Navigation size={16} className="text-rose-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">Destination Drop-off</div>
+                      <div className="text-xs font-bold text-slate-900">{activeTrip.destination}</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-medium">Settled Fare</span>
+                    <span className="text-xl font-black text-slate-900">₹{activeTrip.estimated_fare || activeTrip.fare || '—'}</span>
+                  </div>
+
+                  {/* Trip Controls */}
+                  <div className="flex gap-3 pt-2">
                     {activeTripStatus === 'accepted' && (
                       <button
                         onClick={() => startTripMutation.mutate(activeTripId)}
                         disabled={startTripMutation.isPending}
-                        className="btn-primary flex-1 text-sm"
+                        className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
                       >
-                        {startTripMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
-                        Start Trip
+                        {startTripMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+                        Start Passenger Trip
                       </button>
                     )}
                     {activeTripStatus === 'in_progress' && (
                       <button
                         onClick={() => completeTripMutation.mutate(activeTripId)}
                         disabled={completeTripMutation.isPending}
-                        className="btn-primary flex-1 text-sm"
+                        className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
                       >
-                        {completeTripMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Flag size={15} />}
-                        Complete Trip
+                        {completeTripMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
+                        Complete Trip & Settle Fare
                       </button>
                     )}
                   </div>
@@ -289,54 +340,59 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* Ride Requests */}
+            {/* Incoming Requests Feed */}
             {isOnline && !activeTrip && (
               <div className="card overflow-hidden">
-                <div className="px-5 py-4 border-b border-line flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-ink">Incoming Requests</h2>
-                  {isRequestsLoading && <Loader2 size={15} className="animate-spin text-ink-muted" />}
+                <div className="px-5 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Incoming Dispatch Feed</h3>
+                    <span className="badge bg-emerald-100 text-emerald-800 text-[10px] font-bold">Live Stream</span>
+                  </div>
+                  {isRequestsLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
                 </div>
 
                 {requests.length === 0 ? (
                   <EmptyState
-                    icon={Clock}
-                    title="Waiting for requests"
-                    description="New trip bookings will appear here instantly."
+                    icon={Radio}
+                    title="Scanning for nearby ride bookings..."
+                    description="You are active on the dispatch grid. As soon as passengers book, requests will appear here with live routing."
                   />
                 ) : (
-                  <div className="divide-y divide-[#F3F4F6]">
+                  <div className="divide-y divide-slate-100">
                     {requests.map((req) => (
-                      <div key={req.request_id} className="p-5 hover:bg-canvas transition">
+                      <div key={req.request_id} className="p-5 hover:bg-slate-50 transition-colors">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 text-sm font-medium text-ink mb-1">
-                              <MapPin size={13} className="text-success flex-shrink-0" />
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
+                              <MapPin size={14} className="text-emerald-600 flex-shrink-0" />
                               <span className="truncate">{req.pickup_location}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-ink-muted">
-                              <Navigation size={13} className="text-error flex-shrink-0" />
+                            <div className="flex items-center gap-2 text-xs text-slate-600">
+                              <Navigation size={14} className="text-rose-600 flex-shrink-0" />
                               <span className="truncate">{req.destination}</span>
                             </div>
-                            <div className="flex items-center gap-3 mt-2.5">
-                              <span className="text-base font-bold text-ink">₹{req.estimated_fare}</span>
-                              <span className="badge bg-canvas text-ink-muted capitalize">{req.vehicle_type || 'Sedan'}</span>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-base font-black text-slate-900">₹{req.estimated_fare}</span>
+                              <span className="badge bg-slate-100 text-slate-700 capitalize font-medium text-[10px]">
+                                {req.vehicle_type || 'Sedan'}
+                              </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
                             <button
                               onClick={() => acceptMutation.mutate(req.request_id)}
                               disabled={acceptMutation.isPending}
-                              className="btn-primary text-sm px-4 py-2.5"
+                              className="btn-primary text-xs px-4 py-2.5 flex-1 sm:flex-initial shadow-md shadow-emerald-500/20"
                             >
-                              <CheckCircle size={14} /> Accept
+                              <CheckCircle2 size={15} /> Accept Ride
                             </button>
                             <button
                               onClick={() => rejectMutation.mutate(req.request_id)}
                               disabled={rejectMutation.isPending}
-                              className="btn-danger text-sm px-4 py-2.5"
+                              className="btn-danger text-xs px-3.5 py-2.5"
                             >
-                              <XCircle size={14} />
+                              <XCircle size={15} />
                             </button>
                           </div>
                         </div>
@@ -347,45 +403,45 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* Offline State */}
+            {/* Offline Notification */}
             {!isOnline && !activeTrip && (
               <div className="card p-10">
                 <EmptyState
                   icon={Power}
-                  title="You're Offline"
-                  description="Go online to start accepting passenger ride requests."
+                  title="Driver Radar is Offline"
+                  description="Toggle the switch to go online and start receiving nearby trip dispatch notifications."
                   action={
                     <button
                       onClick={() => availabilityMutation.mutate(true)}
                       disabled={availabilityMutation.isPending}
-                      className="btn-primary"
+                      className="btn-primary shadow-lg shadow-emerald-500/25"
                     >
-                      Go Online
+                      Connect & Go Online
                     </button>
                   }
                 />
               </div>
             )}
 
-            {/* Recent Trips */}
+            {/* Recent Trips Table */}
             {recentTrips.length > 0 && (
               <div className="card overflow-hidden">
-                <div className="px-5 py-4 border-b border-line">
-                  <h2 className="text-sm font-semibold text-ink">Recent Trips</h2>
+                <div className="px-5 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Completed Journeys Today</h3>
                 </div>
-                <div className="divide-y divide-[#F3F4F6]">
+                <div className="divide-y divide-slate-100">
                   {recentTrips.map((trip) => (
-                    <div key={trip.trip_id} className="px-5 py-4 flex items-center justify-between hover:bg-canvas transition">
+                    <div key={trip.trip_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-ink truncate">
+                        <div className="text-xs font-bold text-slate-900 truncate">
                           {trip.pickup_location} → {trip.destination}
                         </div>
-                        <div className="text-xs text-ink-muted mt-0.5">
-                          {trip.passenger_name} · {trip.distance_km} km · {trip.start_time}
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {trip.passenger_name || 'Passenger'} • {trip.start_time || 'Completed'}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-4">
-                        <div className="text-sm font-semibold text-success">+₹{trip.fare}</div>
+                        <div className="text-xs font-black text-emerald-700">+₹{trip.fare}</div>
                         <StatusBadge status={trip.trip_status} className="mt-0.5" />
                       </div>
                     </div>

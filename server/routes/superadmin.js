@@ -814,10 +814,10 @@ module.exports = function superadminRoute(router) {
   // ==============================================================
 
   const DEFAULT_SETTINGS = {
-    platform_name: 'CabGo Transit Network',
+    platform_name: 'Rydio Transit Network',
     currency: 'INR',
     currency_symbol: '₹',
-    support_email: 'support@cabgo.com',
+    support_email: 'support@rydio.com',
     support_phone: '+91 98765 43210',
     operating_city: 'Bengaluru, Karnataka',
     max_cancellations: 3,

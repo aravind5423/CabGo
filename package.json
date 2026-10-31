@@ -1,7 +1,7 @@
 {
   "name": "online-cab-booking",
   "version": "1.0.0",
-  "description": "CabGo – Modern Multi-Tenant Urban Transit & Dispatch Platform",
+  "description": "Rydio – Modern Multi-Tenant Urban Transit & Dispatch Platform",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",

@@ -57,100 +57,123 @@ export function resolveLatLng(input) {
   return null;
 }
 
-// Custom Marker Icons (Zero external image dependencies, Retina-ready)
+// Custom Marker Icons (Inline SVG, Zero external asset latency)
 const createPickupDivIcon = () =>
   L.divIcon({
     html: `
-      <div style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: #10B981;
-        border: 2.5px solid #ffffff;
-        box-shadow: 0 0 14px rgba(16, 185, 129, 0.8), 0 3px 8px rgba(0,0,0,0.5);
-      ">
-        <span style="font-size: 15px; line-height: 1;">📍</span>
+      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: -4px; border-radius: 50%; background: rgba(16, 185, 129, 0.35); animation: pulse-glow 2s infinite;"></div>
+        <div style="
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #10B981, #047857);
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 4px 14px rgba(16, 185, 129, 0.5), 0 2px 6px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
       </div>
     `,
-    className: 'cabgo-pickup-marker',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    className: 'rydio-pickup-marker',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
     popupAnchor: [0, -18],
   });
 
 const createDropDivIcon = () =>
   L.divIcon({
     html: `
-      <div style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: #EF4444;
-        border: 2.5px solid #ffffff;
-        box-shadow: 0 0 14px rgba(239, 68, 68, 0.8), 0 3px 8px rgba(0,0,0,0.5);
-      ">
-        <span style="font-size: 15px; line-height: 1;">🏁</span>
+      <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: -4px; border-radius: 50%; background: rgba(239, 68, 68, 0.3); animation: pulse-glow 2s infinite;"></div>
+        <div style="
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #EF4444, #B91C1C);
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5), 0 2px 6px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
       </div>
     `,
-    className: 'cabgo-drop-marker',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    className: 'rydio-drop-marker',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
     popupAnchor: [0, -18],
   });
 
-// Custom Car Marker with animated glow & bearing rotation
 const createCarDivIcon = (bearing = 0) =>
   L.divIcon({
     html: `
       <div style="
+        position: relative;
+        width: 42px;
+        height: 42px;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(245,158,11,0.98) 0%, rgba(217,119,6,0.9) 100%);
-        border: 2.5px solid #ffffff;
-        box-shadow: 0 0 18px rgba(245, 158, 11, 0.95), 0 3px 8px rgba(0,0,0,0.6);
         transform: rotate(${bearing}deg);
         transition: transform 0.4s ease;
       ">
-        <span style="font-size: 20px; line-height: 1;">🚖</span>
+        <div style="position: absolute; inset: -4px; border-radius: 50%; background: rgba(245, 158, 11, 0.4); animation: pulse-glow 2s infinite;"></div>
+        <div style="
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #F59E0B, #D97706);
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 0 18px rgba(245, 158, 11, 0.8), 0 3px 8px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+        ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2.1 11 2 11.5 2 12v4c0 .6.4 1 1 1h2"/>
+            <circle cx="7" cy="17" r="2"/>
+            <path d="M9 17h6"/>
+            <circle cx="17" cy="17" r="2"/>
+          </svg>
+        </div>
       </div>
     `,
-    className: 'cabgo-vehicle-marker',
-    iconSize: [38, 38],
-    iconAnchor: [19, 19],
-    popupAnchor: [0, -20],
+    className: 'rydio-vehicle-marker',
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    popupAnchor: [0, -22],
   });
 
-// Auto-adjusts view bounds when coordinates change
 function AutoFitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
     const validPoints = points.filter(Boolean);
     if (validPoints.length > 1) {
-      map.fitBounds(validPoints, { padding: [40, 40], maxZoom: 15 });
+      map.fitBounds(validPoints, { padding: [40, 40], maxZoom: 15, animate: true, duration: 0.8 });
     } else if (validPoints.length === 1) {
-      map.setView(validPoints[0], 14);
+      map.setView(validPoints[0], 14, { animate: true });
     }
   }, [points, map]);
   return null;
 }
 
-/**
- * LeafletMap Component
- * - Uses CartoDB Voyager public CDN tiles (reliable, free, complies with web app tile usage policies)
- * - Self-contained SVG/HTML markers for Pickup (Green), Destination (Red), and Driver (🚖 with bearing)
- * - Connecting Route Polyline
- * - Dynamic bounds auto-fit
- */
 export default function LeafletMap({
   pickupCoords,
   dropCoords,
@@ -158,7 +181,7 @@ export default function LeafletMap({
   bearing = 0,
   height = '100%',
   zoom = 13,
-  theme = 'voyager', // 'voyager' | 'dark'
+  theme = 'voyager',
 }) {
   const pCoords = resolveLatLng(pickupCoords);
   const dCoords = resolveLatLng(dropCoords);
@@ -166,7 +189,6 @@ export default function LeafletMap({
 
   const center = vCoords || pCoords || [13.0827, 80.2707];
 
-  // Build active route polyline coordinates
   const polylinePoints = [];
   if (pCoords) polylinePoints.push(pCoords);
   if (vCoords && pCoords && dCoords) {
@@ -182,7 +204,7 @@ export default function LeafletMap({
       : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
   return (
-    <div style={{ height, width: '100%', minHeight: '260px' }}>
+    <div style={{ height, width: '100%', minHeight: '260px' }} className="relative overflow-hidden rounded-2xl shadow-inner">
       <MapContainer
         center={center}
         zoom={zoom}
@@ -202,9 +224,11 @@ export default function LeafletMap({
         {pCoords && (
           <Marker position={pCoords} icon={createPickupDivIcon()}>
             <Popup>
-              <div className="font-sans text-xs">
-                <span className="font-bold text-emerald-700 block">📍 Pickup Location</span>
-                <span>{typeof pickupCoords === 'string' ? pickupCoords : 'Passenger Pickup'}</span>
+              <div className="font-sans text-xs p-1">
+                <span className="font-bold text-emerald-700 block flex items-center gap-1">
+                  Pickup Location
+                </span>
+                <span className="text-slate-600 mt-0.5 block">{typeof pickupCoords === 'string' ? pickupCoords : 'Passenger Pickup'}</span>
               </div>
             </Popup>
           </Marker>
@@ -214,33 +238,37 @@ export default function LeafletMap({
         {dCoords && (
           <Marker position={dCoords} icon={createDropDivIcon()}>
             <Popup>
-              <div className="font-sans text-xs">
-                <span className="font-bold text-red-700 block">🏁 Destination</span>
-                <span>{typeof dropCoords === 'string' ? dropCoords : 'Passenger Destination'}</span>
+              <div className="font-sans text-xs p-1">
+                <span className="font-bold text-rose-700 block flex items-center gap-1">
+                  Destination
+                </span>
+                <span className="text-slate-600 mt-0.5 block">{typeof dropCoords === 'string' ? dropCoords : 'Passenger Destination'}</span>
               </div>
             </Popup>
           </Marker>
         )}
 
-        {/* Driver Partner Pin with Heading */}
+        {/* Driver Partner Pin */}
         {vCoords && (
           <Marker position={vCoords} icon={createCarDivIcon(bearing)}>
             <Popup>
-              <div className="font-sans text-xs">
-                <span className="font-bold text-amber-600 block">🚖 CabGo Driver Partner</span>
-                <span>Live GPS Radar Telemetry</span>
+              <div className="font-sans text-xs p-1">
+                <span className="font-bold text-amber-600 block flex items-center gap-1">
+                  Rydio Driver Partner
+                </span>
+                <span className="text-slate-600 mt-0.5 block">Live GPS Telemetry Active</span>
               </div>
             </Popup>
           </Marker>
         )}
 
-        {/* Route Polyline (Amber Dash) */}
+        {/* Route Polyline */}
         {polylinePoints.length >= 2 && (
           <Polyline
             positions={polylinePoints}
             pathOptions={{
-              color: '#F59E0B',
-              weight: 4,
+              color: '#16A34A',
+              weight: 4.5,
               opacity: 0.9,
               dashArray: '8, 8',
               lineCap: 'round',

@@ -7,15 +7,15 @@ import LeafletMap from '../../components/map/LeafletMap';
 import AppShell from '../../components/ui/AppShell';
 import { EmptyState, StatusBadge, Spinner } from '../../components/ui/UIKit';
 import {
-  MapPin, Navigation, Car, Loader2, AlertCircle, XCircle, CheckCircle, Sparkles
+  MapPin, Navigation, Car, AlertCircle, XCircle, CheckCircle2, Sparkles, ArrowRight
 } from 'lucide-react';
 import clsx from 'clsx';
 
 const VEHICLE_TYPES = [
-  { id: 'sedan',    label: 'Sedan',    icon: '🚗', desc: 'Comfortable 4-seater' },
-  { id: 'suv',      label: 'SUV',      icon: '🚙', desc: 'Spacious 6-seater' },
-  { id: 'hatchback',label: 'Hatchback',icon: '🚘', desc: 'Budget compact' },
-  { id: 'auto',     label: 'Auto',     icon: '🛺', desc: 'Quick & nimble' },
+  { id: 'sedan',     label: 'Sedan',     icon: '🚘', desc: 'Comfortable 4-seater' },
+  { id: 'suv',       label: 'SUV',       icon: '🚙', desc: 'Spacious 6-seater' },
+  { id: 'hatchback', label: 'Hatchback', icon: '🚗', desc: 'City compact economy' },
+  { id: 'auto',      label: 'Auto',      icon: '🛺', desc: 'Fast & affordable' },
 ];
 
 const POPULAR_LOCATIONS = [
@@ -53,7 +53,7 @@ export default function BookRide() {
 
   const estimateFare = async () => {
     if (!form.pickup_location.trim() || !form.destination.trim()) {
-      setError('Please enter both pickup and destination locations.');
+      setError('Please provide both pickup and drop-off addresses.');
       return;
     }
     setEstimating(true);
@@ -69,11 +69,11 @@ export default function BookRide() {
       const fare = data.estimated_fare || data.fareOptions?.[0]?.estimated_fare || 250;
       setFareEstimate({
         fare,
-        distance_km: data.estimated_km || 8.5,
+        distance_km: data.estimated_km || 7.5,
         availableDrivers: data.availableDrivers || 3,
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not estimate fare. Please check your addresses.');
+      setError(err.response?.data?.message || 'Could not calculate routing. Please check addresses.');
     } finally {
       setEstimating(false);
     }
@@ -95,88 +95,81 @@ export default function BookRide() {
       navigate('/passenger/active-trip');
     },
     onError: (err) => {
-      setError(err.response?.data?.message || 'Booking failed.');
+      setError(err.response?.data?.message || 'Booking failed. Please try again.');
       queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
     },
   });
 
-  const cancelMutation = useMutation({
-    mutationFn: (requestId) => api.post(`/rides/cancel/${requestId}`),
-    onSuccess: () => {
-      setSuccessMsg('Active ride cancelled. You can now book a new ride.');
-      setError('');
-      queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['passengerTrips'] });
-      setTimeout(() => setSuccessMsg(''), 4000);
-    },
-    onError: (err) => setError(err.response?.data?.message || 'Failed to cancel active ride.'),
-  });
-
-  const showMapPreview = form.pickup_location.trim() && form.destination.trim();
+  const showMapPreview = Boolean(form.pickup_location.trim() && form.destination.trim());
 
   return (
-    <AppShell title="Book a Ride" subtitle="Enter your route and request a driver">
-      <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
+    <AppShell title="Book a Ride" subtitle="Instant on-demand cab dispatch across Chennai">
+      <div className="max-w-3xl mx-auto space-y-6">
 
-        {/* Active Ride Warning */}
+        {/* Active Ride Alert */}
         {activeRide && (
-          <div className="card-sm p-4 bg-warning-bg border-warning/30 flex items-center justify-between gap-3">
+          <div className="card p-4 bg-amber-500/10 border-amber-500/30 flex items-center justify-between gap-4 animate-slide-in">
             <div className="flex items-center gap-3">
-              <AlertCircle size={18} className="text-warning flex-shrink-0" />
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center flex-shrink-0">
+                <AlertCircle size={20} />
+              </div>
               <div>
-                <div className="text-sm font-semibold text-ink">You already have an active ride</div>
-                <div className="text-xs text-ink-muted">Cancel it first to book a new one.</div>
+                <div className="text-xs font-bold text-amber-900">You already have an ongoing ride (#{activeRide.request_id})</div>
+                <div className="text-[11px] text-amber-700">Track your current driver on the Live Radar.</div>
               </div>
             </div>
             <button
-              onClick={() => cancelMutation.mutate(activeRide.request_id)}
-              disabled={cancelMutation.isPending}
-              className="btn-danger text-xs px-3 py-2"
+              onClick={() => navigate('/passenger/active-trip')}
+              className="btn-primary text-xs px-3.5 py-2 shadow-sm"
             >
-              {cancelMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
-              Cancel Ride
+              Open Active Ride
             </button>
           </div>
         )}
 
-        {/* Success Message */}
-        {successMsg && (
-          <div className="card-sm p-4 bg-success-bg border-success/20 flex items-center gap-2 text-success text-sm font-medium">
-            <CheckCircle size={16} /> {successMsg}
+        {/* Error Notification */}
+        {error && (
+          <div className="card p-4 bg-rose-50 border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-3 animate-fade-in">
+            <XCircle size={18} className="flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Booking Form */}
-        <div className="card p-6 space-y-5">
-          <h2 className="text-base font-semibold text-ink">Route Details</h2>
+        {/* Success Notification */}
+        {successMsg && (
+          <div className="card p-4 bg-emerald-50 border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-3 animate-fade-in">
+            <CheckCircle2 size={18} className="flex-shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
 
-          {/* Error */}
-          {error && (
-            <div className="px-4 py-3 rounded-xl bg-error-bg border border-error/20 text-error text-sm flex items-center gap-2">
-              <AlertCircle size={15} /> {error}
-            </div>
-          )}
-
-          {/* Pickup */}
+        {/* Booking Interface Card */}
+        <div className="card p-6 sm:p-8 space-y-6">
+          {/* Pickup Address */}
           <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-2 flex items-center gap-1.5">
-              <MapPin size={13} className="text-success" /> Pickup Location
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Pickup Location
             </label>
-            <input
-              type="text"
-              name="pickup_location"
-              value={form.pickup_location}
-              onChange={handleChange}
-              placeholder="Enter pickup address or landmark"
-              className="input-field"
-            />
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="relative">
+              <input
+                type="text"
+                name="pickup_location"
+                value={form.pickup_location}
+                onChange={handleChange}
+                placeholder="Enter pickup address, station or landmark"
+                className="input-field pl-10"
+              />
+              <MapPin size={17} className="text-emerald-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Quick chips */}
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
               {POPULAR_LOCATIONS.slice(0, 3).map((loc) => (
                 <button
                   key={loc}
                   type="button"
                   onClick={() => { setForm({ ...form, pickup_location: loc }); setFareEstimate(null); }}
-                  className="text-[11px] px-2.5 py-1 rounded-lg bg-canvas border border-line text-ink-muted hover:text-ink hover:border-line-2 transition"
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 transition"
                 >
                   {loc.split(',')[0]}
                 </button>
@@ -184,26 +177,31 @@ export default function BookRide() {
             </div>
           </div>
 
-          {/* Destination */}
+          {/* Destination Address */}
           <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-2 flex items-center gap-1.5">
-              <Navigation size={13} className="text-error" /> Destination
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500" /> Destination Drop-off
             </label>
-            <input
-              type="text"
-              name="destination"
-              value={form.destination}
-              onChange={handleChange}
-              placeholder="Enter drop-off address or landmark"
-              className="input-field"
-            />
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="relative">
+              <input
+                type="text"
+                name="destination"
+                value={form.destination}
+                onChange={handleChange}
+                placeholder="Where to? (e.g. Airport, T. Nagar, Central)"
+                className="input-field pl-10"
+              />
+              <Navigation size={17} className="text-rose-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Quick chips */}
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
               {POPULAR_LOCATIONS.slice(3, 6).map((loc) => (
                 <button
                   key={loc}
                   type="button"
                   onClick={() => { setForm({ ...form, destination: loc }); setFareEstimate(null); }}
-                  className="text-[11px] px-2.5 py-1 rounded-lg bg-canvas border border-line text-ink-muted hover:text-ink hover:border-line-2 transition"
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 transition"
                 >
                   {loc.split(',')[0]}
                 </button>
@@ -211,52 +209,66 @@ export default function BookRide() {
             </div>
           </div>
 
-          {/* Vehicle Selection */}
+          {/* Vehicle Selection Grid */}
           <div>
-            <label className="block text-xs font-semibold text-ink-muted mb-3 flex items-center gap-1.5">
-              <Car size={13} className="text-info" /> Vehicle Type
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+              Select Fleet Category
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {VEHICLE_TYPES.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => { setForm({ ...form, vehicle_type: v.id }); setFareEstimate(null); }}
-                  className={clsx(
-                    'py-3.5 px-3 rounded-xl text-sm font-medium transition flex flex-col items-center gap-1.5 border cursor-pointer',
-                    form.vehicle_type === v.id
-                      ? 'bg-brand-light border-brand/30 text-brand shadow-sm'
-                      : 'bg-white border-line text-ink-muted hover:border-line-2 hover:text-ink'
-                  )}
-                >
-                  <span className="text-xl">{v.icon}</span>
-                  <span className="font-semibold text-xs">{v.label}</span>
-                  <span className="text-[10px] text-center leading-tight opacity-70">{v.desc}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {VEHICLE_TYPES.map((v) => {
+                const isSelected = form.vehicle_type === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => { setForm({ ...form, vehicle_type: v.id }); setFareEstimate(null); }}
+                    className={clsx(
+                      'p-4 rounded-2xl flex flex-col items-center text-center transition-all cursor-pointer border relative overflow-hidden',
+                      isSelected
+                        ? 'bg-gradient-to-b from-emerald-50 to-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                    )}
+                  >
+                    <span className="text-3xl mb-1 transition-transform duration-300 group-hover:scale-110">{v.icon}</span>
+                    <span className="text-xs font-bold text-slate-900">{v.label}</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 leading-tight">{v.desc}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Fare Estimate */}
+          {/* Live Fare Estimate Card */}
           {fareEstimate && (
-            <div className="p-4 rounded-xl bg-brand-50 border border-brand/20 flex items-center justify-between gap-4">
+            <div className="card p-5 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pop-in">
               <div>
-                <div className="text-xs text-ink-muted font-medium mb-1">Estimated Fare</div>
-                <div className="text-2xl font-bold text-ink">₹{fareEstimate.fare}</div>
-                <div className="text-xs text-ink-muted mt-1">~{fareEstimate.distance_km} km · {fareEstimate.availableDrivers} driver(s) nearby</div>
+                <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Quote Estimate</div>
+                <div className="text-3xl font-black text-slate-900 mt-0.5">
+                  ₹{fareEstimate.fare}
+                </div>
+                <div className="text-xs text-slate-600 mt-1 flex items-center gap-2">
+                  <span>~{fareEstimate.distance_km} km distance</span>
+                  <span>•</span>
+                  <span>{fareEstimate.availableDrivers} verified driver(s) nearby</span>
+                </div>
               </div>
-              <span className="badge bg-success-bg text-success text-xs">Instant Dispatch</span>
+
+              <div className="flex items-center gap-2">
+                <span className="badge bg-emerald-100 text-emerald-800 border-emerald-300 text-xs px-3 py-1 font-bold">
+                  Zero Surge Pricing
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Map Preview */}
+          {/* Route Map Preview */}
           {showMapPreview && (
-            <div>
-              <div className="text-xs font-semibold text-ink-muted mb-2 flex items-center justify-between">
-                <span>Route Preview</span>
-                <span className="text-[11px] text-brand font-medium">Interactive Map</span>
+            <div className="space-y-2 animate-fade-in">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Interactive Route Preview</span>
+                <span className="text-[11px] text-emerald-600">CartoDB Voyager Satellite Tiles</span>
               </div>
-              <div className="rounded-2xl overflow-hidden border border-line h-56">
+              <div className="rounded-2xl overflow-hidden border border-slate-200 h-64 shadow-inner">
                 <LeafletMap
                   pickupCoords={form.pickup_location}
                   dropCoords={form.destination}
@@ -266,25 +278,25 @@ export default function BookRide() {
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-1">
+          {/* Action Row */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               type="button"
               onClick={estimateFare}
               disabled={estimating || !form.pickup_location.trim() || !form.destination.trim()}
-              className="btn-secondary flex-1 disabled:opacity-50"
+              className="btn-secondary flex-1 py-3 text-sm font-bold"
             >
-              {estimating ? <Spinner size={15} className="text-ink-muted" /> : <Sparkles size={15} />}
-              Get Fare Quote
+              {estimating ? <Spinner size={16} className="text-slate-600" /> : <Sparkles size={16} />}
+              {estimating ? 'Calculating...' : 'Calculate Route & Fare'}
             </button>
             <button
               type="button"
               onClick={() => bookMutation.mutate()}
               disabled={bookMutation.isPending || !!activeRide || !form.pickup_location.trim() || !form.destination.trim()}
-              className="btn-primary flex-1 disabled:opacity-50"
+              className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-emerald-500/25"
             >
-              {bookMutation.isPending ? <Spinner size={15} className="text-white" /> : <Car size={15} />}
-              Request Ride
+              {bookMutation.isPending ? <Spinner size={16} className="text-white" /> : <Car size={16} />}
+              {bookMutation.isPending ? 'Dispatching Ride...' : 'Confirm & Request Driver'}
             </button>
           </div>
         </div>
