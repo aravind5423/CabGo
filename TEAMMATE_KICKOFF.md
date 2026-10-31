@@ -1,6 +1,8 @@
 # 🏁 Day 1 Kickoff & Onboarding Guide for Teammate A & Teammate B
 
-> 🚖 **CabGo Enterprise Modernization**: Parallel Execution Guide  
+> 🚖 **CabGo Enterprise Modernization**: Parallel Execution Guide (Pure Modern JavaScript)  
+> ⚡ **Stack**: React 19 (JavaScript / JSX) · Node.js & Express.js · Socket.IO · Redis · MySQL 8.0 · Leaflet · Docker  
+> 🚫 **No TypeScript**: All code is written in pure standard JavaScript (`.js` and `.jsx`). Zero build-step compilation overhead.  
 > 📖 **Master Specifications**: See [PRODUCTION_MIGRATION_PLAN.md](PRODUCTION_MIGRATION_PLAN.md) and [TEAM_PLAN.md](TEAM_PLAN.md).
 
 ---
@@ -17,7 +19,7 @@ flowchart TD
         direction TB
         A_Branch["1. git checkout -b feat/backend-realtime"]
         A_Install["2. npm install express cors helmet zod socket.io ..."]
-        A_Code["3. Express + TS Scaffolding + Concurrency Fix"]
+        A_Code["3. Express JavaScript Scaffolding + Concurrency Fix"]
         A_Test["4. Verify: npm test (20/20 PASS)"]
         A_Branch --> A_Install --> A_Code --> A_Test
     end
@@ -25,9 +27,9 @@ flowchart TD
     subgraph TeammateB ["Teammate B (Frontend & GIS)"]
         direction TB
         B_Branch["1. git checkout -b feat/frontend-spa"]
-        B_Scaffold["2. npm create vite@latest client -- --template react-ts"]
+        B_Scaffold["2. npm create vite@latest client -- --template react"]
         B_Tailwind["3. Install Tailwind CSS + Zustand + Leaflet"]
-        B_UI["4. Build React Portals & Interactive Map HUD"]
+        B_UI["4. Build React JSX Portals & Interactive Map HUD"]
         B_Branch --> B_Scaffold --> B_Tailwind --> B_UI
     end
 
@@ -41,6 +43,7 @@ flowchart TD
 ### 📌 Your Responsibilities
 - **Assigned Phases**: Phase 1 (Backend Core), Phase 2 (Socket.IO + Redis), Phase 5 (Docker & Supertest).
 - **Directory Scope**: `server/`, `database/`, `docker-compose.yml`, `Dockerfile`.
+- **Language**: Pure Modern JavaScript (CommonJS / Node.js ES6+).
 - **Git Branch**: `feat/backend-realtime`.
 
 ### 🚀 Step 1: Branch Setup & Dependency Installation
@@ -53,30 +56,33 @@ git checkout -b feat/backend-realtime
 # 2. Install production backend & real-time dependencies
 npm install express dotenv cors helmet zod mysql2 socket.io @socket.io/redis-adapter ioredis jsonwebtoken bcryptjs pino pino-pretty
 
-# 3. Install developer tooling & TypeScript types
-npm install --save-dev typescript @types/node @types/express @types/cors @types/jsonwebtoken @types/bcryptjs tsx vitest supertest @types/supertest
+# 3. Install testing tools (pure JS, no TypeScript needed)
+npm install --save-dev vitest supertest
 ```
 
 ### 📋 Day 1–2 Implementation Tasks for Teammate A:
 
-#### Task A1: TypeScript Scaffolding
-Create `tsconfig.json` in the root:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["server/**/*.ts", "server/**/*.js"]
-}
+#### Task A1: Express Application Scaffolding (`server/app.js`)
+Create a clean Express application that standardizes middleware and mounts existing routes:
+```javascript
+'use strict';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+
+const app = express();
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: '*' }));
+app.use(express.json());
+app.use(express.static('public'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+module.exports = app;
 ```
 
 #### Task A2: Fix the SSE `decodeToken` Fatal Runtime Crash
@@ -94,7 +100,7 @@ module.exports = {
 #### Task A3: Fix the Concurrency Race Condition (Double-Booking Bug)
 In [`server/routes/driver.js`](server/routes/driver.js) inside the ride-acceptance handler (`PUT /api/driver/ride-requests/:id/accept`), replace the naive read-then-write sequence with an atomic compare-and-swap update:
 ```javascript
-// Execute atomic conditional update
+// Execute atomic conditional update in standard MySQL
 const [updateResult] = await conn.execute(
   `UPDATE ride_requests 
    SET status = 'accepted' 
@@ -113,9 +119,10 @@ if (updateResult.affectedRows === 0) {
 ```
 
 #### Task A4: Attach Socket.IO to the Server
-In `server/server.js` (or `server/src/app.ts`), attach Socket.IO:
+In `server/server.js`, attach Socket.IO:
 ```javascript
 const { Server } = require('socket.io');
+
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST', 'PUT'] }
 });
@@ -123,9 +130,15 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log('[Socket.IO] Client connected:', socket.id);
 
+  // Driver GPS heartbeat
   socket.on('driver:ping_location', (data) => {
-    // Broadcast to trip subscribers or update Redis Geo index
-    io.emit('driver:location_tick', data);
+    socket.broadcast.emit('driver:location_tick', data);
+  });
+
+  // Join trip room
+  socket.on('trip:join', (tripId) => {
+    socket.join(`trip:${tripId}`);
+    console.log(`Socket ${socket.id} joined room trip:${tripId}`);
   });
 });
 ```
@@ -144,21 +157,22 @@ npm test
 ### 📌 Your Responsibilities
 - **Assigned Phases**: Phase 3 (React SPA Core), Phase 4 (Leaflet GIS Maps & HUD), Phase 6 (Playwright E2E).
 - **Directory Scope**: `client/` *(brand new isolated folder)*.
+- **Language**: Pure React 19 + JavaScript (`.jsx` / `.js`).
 - **Git Branch**: `feat/frontend-spa`.
 
-### 🚀 Step 1: Branch Setup & Vite React Scaffold
+### 🚀 Step 1: Branch Setup & Vite React Scaffold (Pure JavaScript)
 Open your terminal in the repository root and execute:
 
 ```bash
 # 1. Create and switch to your dedicated branch
 git checkout -b feat/frontend-spa
 
-# 2. Scaffold React 19 + TypeScript SPA inside client/
-npm create vite@latest client -- --template react-ts
+# 2. Scaffold React 19 JavaScript SPA inside client/ (use template 'react', NOT 'react-ts')
+npm create vite@latest client -- --template react
 
 # 3. Enter client directory & install UI dependencies
 cd client
-npm install react-router-dom zustand @tanstack/react-query lucide-react clsx tailwindcss postcss autoprefixer socket.io-client leaflet react-leaflet @types/leaflet
+npm install react-router-dom zustand @tanstack/react-query lucide-react clsx tailwindcss postcss autoprefixer socket.io-client leaflet react-leaflet axios
 
 # 4. Initialize Tailwind CSS
 npx tailwindcss init -p
@@ -170,7 +184,7 @@ npx tailwindcss init -p
 ```javascript
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
@@ -186,9 +200,9 @@ export default {
 }
 ```
 
-#### Task B2: Setup Base API & Socket Clients (`client/src/services/api.ts`)
+#### Task B2: Setup Base API & Socket Clients (`client/src/services/api.js`)
 Connect directly to the running backend on port 5000:
-```typescript
+```javascript
 import axios from 'axios';
 
 export const api = axios.create({
@@ -205,8 +219,8 @@ api.interceptors.request.use((config) => {
 });
 ```
 
-And `client/src/services/socket.ts`:
-```typescript
+And `client/src/services/socket.js`:
+```javascript
 import { io } from 'socket.io-client';
 
 export const socket = io('http://localhost:5000', {
@@ -214,27 +228,13 @@ export const socket = io('http://localhost:5000', {
 });
 ```
 
-#### Task B3: Setup Centralized State Stores with Zustand (`client/src/store/authStore.ts`)
-```typescript
+#### Task B3: Setup Centralized State Stores with Zustand (`client/src/store/authStore.js`)
+```javascript
 import { create } from 'zustand';
 
-interface User {
-  user_id: number;
-  name: string;
-  email: string;
-  role: 'passenger' | 'driver' | 'admin' | 'superadmin';
-}
-
-interface AuthState {
-  token: string | null;
-  user: User | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create((set) => ({
   token: localStorage.getItem('cab_token'),
-  user: localStorage.getItem('cab_user') ? JSON.parse(localStorage.getItem('cab_user')!) : null,
+  user: localStorage.getItem('cab_user') ? JSON.parse(localStorage.getItem('cab_user')) : null,
   login: (token, user) => {
     localStorage.setItem('cab_token', token);
     localStorage.setItem('cab_user', JSON.stringify(user));
@@ -248,9 +248,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 }));
 ```
 
-#### Task B4: Setup React Router & Portals (`client/src/App.tsx`)
+#### Task B4: Setup React Router & Portals (`client/src/App.jsx`)
 Create routes for the 4 portals:
-```tsx
+```jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/auth/Login';
 import PassengerDashboard from './pages/passenger/Dashboard';
@@ -274,20 +274,14 @@ export default function App() {
 }
 ```
 
-#### Task B5: Leaflet GIS Map Component (`client/src/components/map/LeafletMap.tsx`)
+#### Task B5: Leaflet GIS Map Component (`client/src/components/map/LeafletMap.jsx`)
 Replace the legacy mock SVG curve with a real OpenStreetMap tile view:
-```tsx
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+```jsx
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-interface MapProps {
-  pickupCoords?: [number, number];
-  dropCoords?: [number, number];
-  driverCoords?: [number, number];
-}
-
-export default function LeafletMap({ pickupCoords, dropCoords, driverCoords }: MapProps) {
-  const center: [number, number] = pickupCoords || [13.0827, 80.2707]; // Default Chennai
+export default function LeafletMap({ pickupCoords, dropCoords, driverCoords }) {
+  const center = pickupCoords || [13.0827, 80.2707]; // Default Chennai
 
   return (
     <MapContainer center={center} zoom={13} style={{ height: '400px', width: '100%', borderRadius: '16px' }}>

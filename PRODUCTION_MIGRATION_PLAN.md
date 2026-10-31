@@ -1,6 +1,7 @@
 # 🚖 CabGo Production Modernization & Implementation Plan
 
-> **Target Architecture**: React 18/19 · Vite · TypeScript · Express.js · Socket.IO · Redis (Geo & Pub/Sub) · MySQL 8.0 / PostgreSQL · Drizzle ORM · Leaflet/Mapbox · Docker  
+> **Target Architecture**: React 19 (JavaScript / JSX) · Vite · Express.js · Socket.IO · Redis (Geo & Pub/Sub) · MySQL 8.0 / PostgreSQL · Leaflet/Mapbox · Docker  
+> **Tech Decision**: 🚫 **Strictly No TypeScript** — The entire platform will use pure modern JavaScript (Node.js ES6+ on backend, React JSX on frontend) to eliminate build-step complexity and maximize development velocity.  
 > **Target Outcome**: Transform the raw HTML/fundamental Node.js CIA assignment prototype into a high-performance, real-time, production-ready urban transit platform.
 
 ---
@@ -23,7 +24,7 @@
 
 The existing CabGo repository was built to comply with an academic constraint (*zero external frameworks, raw Node.js `http` only, vanilla JS/DOM*). While it proved the core transit workflow across 4 user roles, it is **not production-grade**.
 
-This plan outlines the complete engineering blueprint for the team to refactor the platform into an enterprise-ready, scalable prototype with modern tooling, type safety, real-time bidirectional messaging, real GIS maps, and rock-solid concurrency safety.
+This plan outlines the complete engineering blueprint for the team to refactor the platform into an enterprise-ready, scalable prototype using **modern pure JavaScript**, real-time bidirectional messaging (Socket.IO), Redis geospatial dispatch, real GIS maps (Leaflet), and rock-solid concurrency safety.
 
 ---
 
@@ -47,7 +48,7 @@ Before writing any new code, the team must understand the flaws discovered durin
 
 ```mermaid
 graph TB
-    subgraph Clients ["Client Layer (Vite + React 19 + TypeScript)"]
+    subgraph Clients ["Client Layer (Vite + React 19 JavaScript)"]
         PassApp["Passenger App<br/>(/passenger/*)"]
         DrivApp["Driver Console<br/>(/driver/*)"]
         AdminApp["Admin & SuperAdmin<br/>(/admin/*, /superadmin/*)"]
@@ -59,7 +60,7 @@ graph TB
         Helmet["Security Headers & Strict CORS"]
     end
 
-    subgraph AppServer ["Application Layer (Express.js + TypeScript)"]
+    subgraph AppServer ["Application Layer (Express.js JavaScript)"]
         API["REST API Router (Zod Validated)"]
         SocketEngine["Socket.IO Server Engine"]
         DispatchService["Dispatch & Matchmaking Service"]
@@ -80,8 +81,8 @@ graph TB
 
     subgraph Storage ["Persistent Storage Layer"]
         DB[(MySQL 8.0 / PostgreSQL)]
-        ORM["Drizzle ORM / Prisma (Connection Pool + Row Locks)"]
-        DB --- ORM
+        Pool["mysql2/promise Connection Pool (ACID + Row Locks)"]
+        DB --- Pool
     end
 
     Clients <-->|HTTPS / REST| Edge
@@ -89,7 +90,7 @@ graph TB
     Edge --> AppServer
     SocketEngine <--> PubSub
     DispatchService <--> GeoIndex
-    AppServer <--> ORM
+    AppServer <--> Pool
     TripStateMachine <--> SessionLock
 ```
 
@@ -101,17 +102,17 @@ To parallelize implementation, the team will divide into 4 dedicated streams:
 
 ```mermaid
 flowchart LR
-    BE[Backend Lead] -->|Express + TS + Zod + DB Pool| Core[Core Platform]
+    BE[Backend Lead] -->|Express + JS + Zod + DB Pool| Core[Core Platform]
     RT[Real-Time & DevOps] -->|Socket.IO + Redis GEO + Docker| Engine[Dispatch Engine]
-    FE[Frontend Lead] -->|React + Vite + Tailwind + Zustand| UI[SPA Client]
+    FE[Frontend Lead] -->|React JSX + Vite + Tailwind + Zustand| UI[SPA Client]
     QA[QA & Test Lead] -->|Vitest + Supertest + Playwright| Test[Test & Verification]
 ```
 
 | Stream | Primary Owner | Deliverables | Key Dependencies |
 | :--- | :--- | :--- | :--- |
-| **Stream 1: Backend Core** | Backend Engineer(s) | Express + TypeScript app, Zod validators, Drizzle/Prisma schema, atomic DB queries. | Node.js, MySQL / Postgres |
+| **Stream 1: Backend Core** | Backend Engineer(s) | Express.js application, Zod validators, MySQL connection pool, atomic DB queries. | Node.js, MySQL / Postgres |
 | **Stream 2: Real-Time & Infra** | Real-Time / DevOps Engineer | Socket.IO gateway, Redis pub/sub adapter, Redis GEO driver locator, Docker Compose. | Redis, Socket.IO |
-| **Stream 3: Modern Frontend** | Frontend Engineer(s) | Vite + React SPA, Zustand auth/trip stores, Tailwind CSS components, Leaflet maps. | REST API, Socket.IO Client |
+| **Stream 3: Modern Frontend** | Frontend Engineer(s) | Vite + React JavaScript SPA, Zustand auth/trip stores, Tailwind CSS components, Leaflet maps. | REST API, Socket.IO Client |
 | **Stream 4: QA & Verification** | QA / Test Engineer | Automated test suites (Unit, API, E2E), race-condition load testing script. | Supertest, Playwright, k6 |
 
 ---
@@ -119,13 +120,13 @@ flowchart LR
 ## 5. Step-by-Step Sprint Execution Roadmap
 
 ### 🏃 Sprint 1: Backend Scaffolding & ACID Data Layer (Days 1–3)
-- [ ] **Task 1.1**: Initialize TypeScript & Express in `server/` with `tsconfig.json`, `package.json` scripts (`build`, `dev`, `lint`).
+- [ ] **Task 1.1**: Initialize Express.js in `server/app.js` with standard middleware (`cors`, `helmet`, `express.json`).
 - [ ] **Task 1.2**: Install core production dependencies:
   ```bash
   npm install express dotenv cors helmet pino pino-pretty zod mysql2 socket.io @socket.io/redis-adapter ioredis jsonwebtoken bcryptjs
-  npm install --save-dev typescript @types/node @types/express @types/cors @types/jsonwebtoken @types/bcryptjs tsx vitest supertest @types/supertest
+  npm install --save-dev vitest supertest
   ```
-- [ ] **Task 1.3**: Configure strict Zod schemas for all request payloads (`authSchema`, `rideBookingSchema`, `availabilitySchema`, `ratingSchema`).
+- [ ] **Task 1.3**: Configure Zod schemas for all request payloads (`authSchema`, `rideBookingSchema`, `availabilitySchema`, `ratingSchema`).
 - [ ] **Task 1.4**: Fix the transaction vulnerability:
   - Migrate from HTTP TiDB driver to standard connection pool (`mysql2/promise` with SSL).
   - Implement atomic conditional updates:
@@ -153,16 +154,16 @@ flowchart LR
   - `admin:telemetry`: Broadcast stream for operations admin monitoring.
 
 ### 🎨 Sprint 3: React SPA Client & Component Architecture (Days 7–9)
-- [ ] **Task 3.1**: Initialize Vite React TypeScript application in `client/`:
+- [ ] **Task 3.1**: Initialize Vite React JavaScript application in `client/`:
   ```bash
-  npm create vite@latest client -- --template react-ts
-  cd client && npm install react-router-dom zustand @tanstack/react-query lucide-react clsx tailwindcss postcss autoprefixer socket.io-client
+  npm create vite@latest client -- --template react
+  cd client && npm install react-router-dom zustand @tanstack/react-query lucide-react clsx tailwindcss postcss autoprefixer socket.io-client axios leaflet react-leaflet
   ```
 - [ ] **Task 3.2**: Configure Tailwind CSS with design system tokens (dark/light mode, brand yellow `#F59E0B`, emerald `#10B981`, slate slate-900).
-- [ ] **Task 3.3**: Build Centralized State Stores:
-  - `useAuthStore`: Token, current user profile, role, login/logout actions.
-  - `useTripStore`: Active ride request, trip status, driver details, estimated fare, socket event listeners.
-- [ ] **Task 3.4**: Setup Role-Based Routing with guards:
+- [ ] **Task 3.3**: Build Centralized State Stores (`client/src/store/`):
+  - `authStore.js`: Token, current user profile, role, login/logout actions.
+  - `tripStore.js`: Active ride request, trip status, driver details, estimated fare, socket event listeners.
+- [ ] **Task 3.4**: Setup Role-Based Routing with guards (`client/src/App.jsx`):
   - `/login`, `/register`, `/search` (Public)
   - `/passenger/*` (Guarded: `passenger`)
   - `/driver/*` (Guarded: `driver`)
@@ -170,7 +171,7 @@ flowchart LR
   - `/superadmin/*` (Guarded: `superadmin`)
 
 ### 🗺️ Sprint 4: Real GIS Maps & Live Telemetry HUD (Days 10–12)
-- [ ] **Task 4.1**: Install mapping library (`leaflet`, `react-leaflet`, `@types/leaflet`).
+- [ ] **Task 4.1**: Install mapping library (`leaflet`, `react-leaflet`).
 - [ ] **Task 4.2**: Replace SVG mock visualizer with real Leaflet / Mapbox map:
   - Passenger pickup & dropoff marker placement.
   - OpenRouteService / OSRM route polyline drawing.
@@ -186,7 +187,7 @@ flowchart LR
 - [ ] **Task 5.1**: Build production multi-stage `Dockerfile` and `docker-compose.yml` (Node App, Redis, MySQL).
 - [ ] **Task 5.2**: Write API integration test suite using `vitest` + `supertest` covering all 20 lifecycle cases.
 - [ ] **Task 5.3**: Run concurrency stress test (10 simulated drivers attempting to accept 1 ride simultaneously) to confirm zero race conditions.
-- [ ] **Task 5.4**: Set up GitHub Actions CI workflow for linting, typechecking, and automated test execution.
+- [ ] **Task 5.4**: Set up GitHub Actions CI workflow for linting, syntax checking, and automated test execution.
 
 ---
 
@@ -233,13 +234,13 @@ sequenceDiagram
 
 | Event Name | Direction | Payload Schema | Description |
 | :--- | :--- | :--- | :--- |
-| `driver:ping_location` | Client -> Server | `{ lat: number, lng: number, bearing: number, speed: number }` | Driver GPS heartbeat. Updates Redis GEO index. |
-| `ride:offer` | Server -> Client | `{ requestId: number, pickup: string, destination: string, fare: number, expiresAt: number }` | Sent to nearby drivers with 15-second countdown. |
-| `ride:accept` | Client -> Server | `{ requestId: number }` | Driver attempts to claim ride. |
-| `trip:matched` | Server -> Client | `{ tripId: number, driver: DriverInfo, vehicle: VehicleInfo, etaMinutes: number }` | Notifies passenger that driver is en route. |
-| `trip:location_tick` | Client -> Server | `{ tripId: number, lat: number, lng: number, bearing: number }` | Driver transmits coordinates along route. |
-| `trip:driver_moved` | Server -> Client | `{ lat: number, lng: number, bearing: number }` | Relayed to passenger to animate vehicle on map. |
-| `trip:finished` | Server -> Client | `{ tripId: number, fare: number, distanceKm: number, receiptUrl: string }` | Opens settlement modal for both parties. |
+| `driver:ping_location` | Client -> Server | `{ lat, lng, bearing, speed }` | Driver GPS heartbeat. Updates Redis GEO index. |
+| `ride:offer` | Server -> Client | `{ requestId, pickup, destination, fare, expiresAt }` | Sent to nearby drivers with 15-second countdown. |
+| `ride:accept` | Client -> Server | `{ requestId }` | Driver attempts to claim ride. |
+| `trip:matched` | Server -> Client | `{ tripId, driver, vehicle, etaMinutes }` | Notifies passenger that driver is en route. |
+| `trip:location_tick` | Client -> Server | `{ tripId, lat, lng, bearing }` | Driver transmits coordinates along route. |
+| `trip:driver_moved` | Server -> Client | `{ lat, lng, bearing }` | Relayed to passenger to animate vehicle on map. |
+| `trip:finished` | Server -> Client | `{ tripId, fare, distanceKm, receiptUrl }` | Opens settlement modal for both parties. |
 
 ---
 
@@ -248,18 +249,18 @@ sequenceDiagram
 ### The Concurrency Problem
 When two drivers accept the same pending ride at the exact same millisecond, naive query sequences cause race conditions.
 
-### The Solution: Atomic Conditional Execution
+### The Solution: Atomic Conditional Execution (Pure JavaScript)
 We eliminate the bug using atomic conditional execution that requires no distributed locks:
 
-```typescript
-// server/src/services/trip.service.ts
-export async function acceptRideAtomic(driverId: number, requestId: number, vehicleId: number) {
+```javascript
+// server/services/tripService.js
+async function acceptRideAtomic(pool, driverId, requestId, vehicleId) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
     // 1. Atomic compare-and-swap update
-    const [updateResult] = await connection.execute<ResultSetHeader>(
+    const [updateResult] = await connection.execute(
       `UPDATE ride_requests 
        SET status = 'accepted' 
        WHERE request_id = ? AND status = 'pending'`,
@@ -273,14 +274,14 @@ export async function acceptRideAtomic(driverId: number, requestId: number, vehi
     }
 
     // 2. Fetch ride details safely
-    const [rides] = await connection.execute<RowDataPacket[]>(
+    const [rides] = await connection.execute(
       `SELECT * FROM ride_requests WHERE request_id = ?`,
       [requestId]
     );
     const ride = rides[0];
 
     // 3. Create trip record
-    const [tripResult] = await connection.execute<ResultSetHeader>(
+    const [tripResult] = await connection.execute(
       `INSERT INTO trips (request_id, passenger_id, driver_id, vehicle_id, fare, trip_status, start_time)
        VALUES (?, ?, ?, ?, ?, 'accepted', NOW())`,
       [requestId, ride.passenger_id, driverId, vehicleId, ride.estimated_fare]
@@ -295,6 +296,8 @@ export async function acceptRideAtomic(driverId: number, requestId: number, vehi
     connection.release();
   }
 }
+
+module.exports = { acceptRideAtomic };
 ```
 
 ---
@@ -306,23 +309,22 @@ export async function acceptRideAtomic(driverId: number, requestId: number, vehi
 client/src/
 ├── assets/                  # Icons, markers, brand SVGs
 ├── components/
-│   ├── common/              # Button, Input, Modal, Toast, Badge, Card
-│   ├── layout/              # Navbar, Sidebar, MobileDrawer, RoleGuard
-│   ├── map/                 # LeafletMap, VehicleMarker, RoutePolyline
-│   └── trip/                # StatusStepper, FareEstimateCard, RatingModal
-├── context/                 # SocketContext, ThemeContext
-├── hooks/                   # useSocket, useGeolocation, useDebounce
+│   ├── common/              # Button.jsx, Input.jsx, Modal.jsx, Toast.jsx, Badge.jsx
+│   ├── layout/              # Navbar.jsx, Sidebar.jsx, MobileDrawer.jsx, RoleGuard.jsx
+│   ├── map/                 # LeafletMap.jsx, VehicleMarker.jsx, RoutePolyline.jsx
+│   └── trip/                # StatusStepper.jsx, FareEstimateCard.jsx, RatingModal.jsx
+├── context/                 # SocketContext.jsx, ThemeContext.jsx
+├── hooks/                   # useSocket.js, useGeolocation.js, useDebounce.js
 ├── pages/
-│   ├── auth/                # Login, Register
-│   ├── passenger/           # Dashboard, BookRide, ActiveTrip, History
-│   ├── driver/              # Dashboard, IncomingRequests, NavigationHUD, Earnings
-│   ├── admin/               # Overview, UserModeration, FleetAudit, FareMatrix
-│   └── superadmin/          # SystemSettings, AuditLogs, RolePermissions
-├── services/                # api.ts (Axios/Ky instance), socket.ts
-├── store/                   # authStore.ts, tripStore.ts (Zustand)
-├── types/                   # Shared TypeScript interfaces
-├── App.tsx                  # React Router configuration
-└── main.tsx                 # Entrypoint
+│   ├── auth/                # Login.jsx, Register.jsx
+│   ├── passenger/           # Dashboard.jsx, BookRide.jsx, ActiveTrip.jsx, History.jsx
+│   ├── driver/              # Dashboard.jsx, IncomingRequests.jsx, NavigationHUD.jsx, Earnings.jsx
+│   ├── admin/               # Overview.jsx, UserModeration.jsx, FleetAudit.jsx, FareMatrix.jsx
+│   └── superadmin/          # SystemSettings.jsx, AuditLogs.jsx, RolePermissions.jsx
+├── services/                # api.js (Axios instance), socket.js
+├── store/                   # authStore.js, tripStore.js (Zustand)
+├── App.jsx                  # React Router configuration
+└── main.jsx                 # Entrypoint
 ```
 
 ---
@@ -399,12 +401,12 @@ The modernized platform must pass 4 automated verification gates before producti
 
 ```mermaid
 graph LR
-    G1[Gate 1: Unit & Typecheck<br/>Vitest + tsc] --> G2[Gate 2: API Parity<br/>Supertest 20/20 Passing]
+    G1[Gate 1: JavaScript Quality<br/>ESLint + Node Syntax] --> G2[Gate 2: API Parity<br/>Supertest 20/20 Passing]
     G2 --> G3[Gate 3: Concurrency<br/>k6 Zero Double-Bookings]
     G3 --> G4[Gate 4: E2E Lifecycle<br/>Playwright User Flow]
 ```
 
-1. **Gate 1: TypeScript & Linting**: Zero compiler warnings (`tsc --noEmit`), 100% type coverage on all API inputs/outputs.
+1. **Gate 1: JavaScript Quality & Syntax**: Zero syntax errors (`node --check server/**/*.js`), clean ESLint check.
 2. **Gate 2: API Parity**: All 20 lifecycle steps currently verified by `e2e_test.js` must pass under the new Express controllers.
 3. **Gate 3: Race Condition Stress Test**: 10 simultaneous simulated driver `PUT /api/driver/ride-requests/:id/accept` requests against the same ride request.
    - **Expectation**: Exactly **1** returns `200 OK` (Trip created); **9** return `409 Conflict` (Ride already claimed).
@@ -412,4 +414,4 @@ graph LR
 
 ---
 
-> 🚀 **Next Immediate Step**: Have the backend team begin **Sprint 1, Task 1.1–1.5** to modernize Express + TypeScript while preserving existing route contracts.
+> 🚀 **Next Immediate Step**: Have Teammate A run the commands in [TEAMMATE_KICKOFF.md](TEAMMATE_KICKOFF.md) to set up Express and the atomic concurrency query!
