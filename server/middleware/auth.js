@@ -53,4 +53,10 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { createToken, verifyToken, authenticate, requireRole };
+module.exports = { 
+  createToken, 
+  verifyToken, 
+  decodeToken: verifyToken, // Fixes runtime error in server/routes/stream.js
+  authenticate, 
+  requireRole 
+};

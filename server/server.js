@@ -208,8 +208,45 @@ const server = http.createServer(async (req, res) => {
   serveStatic(res, filePath);
 });
 
+// ── Socket.IO Real-Time Engine Integration ────────────────────
+let io = null;
+try {
+  const { Server } = require('socket.io');
+  io = new Server(server, {
+    cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }
+  });
+
+  io.on('connection', (socket) => {
+    // console.log('[Socket.IO] Client connected:', socket.id);
+
+    // Join room helpers
+    socket.on('join:trip', (tripId) => {
+      socket.join(`trip:${tripId}`);
+    });
+
+    socket.on('join:driver', (driverId) => {
+      socket.join(`driver:${driverId}`);
+    });
+
+    // Driver location telemetry heartbeat
+    socket.on('driver:ping_location', (data) => {
+      if (data && data.tripId) {
+        io.to(`trip:${data.tripId}`).emit('driver:location_tick', data);
+      } else {
+        io.emit('driver:location_tick', data);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      // client disconnected
+    });
+  });
+} catch (err) {
+  console.warn('[Socket.IO] Initialization warning:', err.message);
+}
+
 server.listen(PORT, () => {
   console.log(`\n🚖 Cab Booking Server running → http://localhost:${PORT}\n`);
 });
 
-module.exports = { sendJSON, readBody }; // exported for route files
+module.exports = { server, io, sendJSON, readBody }; // exported for route files

@@ -7,7 +7,7 @@ let serverProc;
 
 async function startServer() {
   return new Promise((resolve, reject) => {
-    serverProc = spawn('node', ['server/server.js'], { stdio: ['ignore','pipe','pipe'], cwd: 'c:/webTechProjectCIA' });
+    serverProc = spawn(process.execPath, ['server/server.js'], { stdio: ['ignore','pipe','pipe'], cwd: __dirname });
     let ready = false;
     serverProc.stdout.on('data', d => {
       const s = d.toString();
