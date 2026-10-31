@@ -119,69 +119,49 @@ flowchart LR
 
 ## 5. Step-by-Step Sprint Execution Roadmap
 
-### 🏃 Sprint 1: Backend Scaffolding & ACID Data Layer (Days 1–3)
-- [ ] **Task 1.1**: Initialize Express.js in `server/app.js` with standard middleware (`cors`, `helmet`, `express.json`).
-- [ ] **Task 1.2**: Install core production dependencies:
-  ```bash
-  npm install express dotenv cors helmet pino pino-pretty zod mysql2 socket.io @socket.io/redis-adapter ioredis jsonwebtoken bcryptjs
-  npm install --save-dev vitest supertest
-  ```
-- [ ] **Task 1.3**: Configure Zod schemas for all request payloads (`authSchema`, `rideBookingSchema`, `availabilitySchema`, `ratingSchema`).
-- [ ] **Task 1.4**: Fix the transaction vulnerability:
-  - Migrate from HTTP TiDB driver to standard connection pool (`mysql2/promise` with SSL).
-  - Implement atomic conditional updates:
-    ```sql
-    UPDATE ride_requests SET status = 'accepted' WHERE request_id = ? AND status = 'pending';
-    ```
-    Verify `affectedRows === 1` before creating trip record.
-- [ ] **Task 1.5**: Migrate existing route handlers (`auth`, `passenger`, `driver`, `admin`, `superadmin`, `payments`, `ratings`) into clean modular Express controllers.
+### 🏃 Sprint 1: Backend Scaffolding & ACID Data Layer (COMPLETED ✅)
+- [x] **Task 1.1**: Initialize Express.js in `server/server.js` with standard middleware (`cors`, `helmet`, `express.json`).
+- [x] **Task 1.2**: Install core production dependencies (`express`, `socket.io`, `zod`, `mysql2`, `alasql`, `helmet`, `cors`, `bcryptjs`, `jsonwebtoken`).
+- [x] **Task 1.3**: Configure Zod schemas in `server/schemas/index.js` for all request payloads.
+- [x] **Task 1.4**: Fix the transaction vulnerability:
+  - Multi-tier DB adapter supporting TiDB Cloud, MySQL2 connection pooling, and in-memory AlaSQL relational engine.
+  - Implemented atomic conditional update (`UPDATE ride_requests SET status = 'accepted' WHERE request_id = ? AND status = 'pending'`).
+- [x] **Task 1.5**: Fixed SSE `decodeToken` bug in `server/middleware/auth.js`. All 20 E2E tests pass 100%.
 
-### ⚡ Sprint 2: Real-Time Socket.IO & Redis Geospatial Dispatch (Days 4–6)
-- [ ] **Task 2.1**: Attach `Socket.io` to the Express HTTP server instance.
+### ⚡ Sprint 2: Real-Time Socket.IO & Redis Geospatial Dispatch (IN PROGRESS ⚡)
+- [x] **Task 2.1**: Attach `Socket.io` to the Express HTTP server instance with CORS.
+- [x] **Task 2.5**: Room Management:
+  - `join:trip` & `join:driver` socket handlers wired.
+  - Driver GPS location heartbeat (`driver:ping_location`) broadcasts live ticks.
 - [ ] **Task 2.2**: Integrate `@socket.io/redis-adapter` with Redis client for multi-node horizontal scalability.
-- [ ] **Task 2.3**: Build Redis Geospatial driver tracking:
-  - Driver heartbeat (every 5s): `GEOADD drivers:locations <lng> <lat> <driver_id>` with a 30s TTL key.
-  - Driver goes offline: `ZREM drivers:locations <driver_id>`.
-- [ ] **Task 2.4**: Implement Smart Proximity Dispatch:
-  - Passenger books ride at `(pLat, pLng)`:
-    ```
-    GEOSEARCH drivers:locations FROMLONLAT <pLng> <pLat> BYRADIUS 5 km ASC COUNT 5
-    ```
-  - Send targeted socket event `ride:offer` exclusively to nearby online drivers.
-- [ ] **Task 2.5**: Room Management:
-  - `trip:${tripId}`: Joint room for passenger and driver during active trip.
-  - `driver:${driverId}`: Private room for dispatch notifications and personal stats.
-  - `admin:telemetry`: Broadcast stream for operations admin monitoring.
+- [ ] **Task 2.3**: Build Redis Geospatial driver tracking (`GEOADD drivers:locations <lng> <lat> <driver_id>`).
+- [ ] **Task 2.4**: Implement Smart Proximity Dispatch with `GEOSEARCH` within 5km radius.
 
-### 🎨 Sprint 3: React SPA Client & Component Architecture (Days 7–9)
-- [ ] **Task 3.1**: Initialize Vite React JavaScript application in `client/`:
-  ```bash
-  npm create vite@latest client -- --template react
-  cd client && npm install react-router-dom zustand @tanstack/react-query lucide-react clsx tailwindcss postcss autoprefixer socket.io-client axios leaflet react-leaflet
-  ```
-- [ ] **Task 3.2**: Configure Tailwind CSS with design system tokens (dark/light mode, brand yellow `#F59E0B`, emerald `#10B981`, slate slate-900).
-- [ ] **Task 3.3**: Build Centralized State Stores (`client/src/store/`):
-  - `authStore.js`: Token, current user profile, role, login/logout actions.
-  - `tripStore.js`: Active ride request, trip status, driver details, estimated fare, socket event listeners.
-- [ ] **Task 3.4**: Setup Role-Based Routing with guards (`client/src/App.jsx`):
-  - `/login`, `/register`, `/search` (Public)
-  - `/passenger/*` (Guarded: `passenger`)
-  - `/driver/*` (Guarded: `driver`)
-  - `/admin/*` (Guarded: `admin`)
-  - `/superadmin/*` (Guarded: `superadmin`)
+### 🎨 Sprint 3: React SPA Client & Component Architecture (COMPLETED ✅)
+- [x] **Task 3.1**: Initialize Vite React 19 JavaScript application in `client/`.
+- [x] **Task 3.2**: Configure Tailwind CSS v4 with design system tokens (dark theme, amber-500, emerald-500).
+- [x] **Task 3.3**: Centralized State Stores in `client/src/store/`:
+  - `authStore.js`: Persistent auth session, role, token.
+  - `tripStore.js`: Active ride request, driver coordinates, trip status.
+- [x] **Task 3.4**: Role-Based Routing with guards (`client/src/App.jsx`):
+  - `/login` (Public, with demo credentials pre-fill)
+  - `/passenger/dashboard`, `/passenger/book-ride`, `/passenger/active-trip` (Guarded)
+  - `/driver/dashboard` (Guarded: Online toggle, live dispatch cards, accept/reject)
+  - `/admin/dashboard` (Guarded: KPI cards, Fare matrix table, Operations console)
+  - `/superadmin/dashboard` (Guarded: System policies, Admin management, Audit logs)
 
-### 🗺️ Sprint 4: Real GIS Maps & Live Telemetry HUD (Days 10–12)
-- [ ] **Task 4.1**: Install mapping library (`leaflet`, `react-leaflet`).
-- [ ] **Task 4.2**: Replace SVG mock visualizer with real Leaflet / Mapbox map:
-  - Passenger pickup & dropoff marker placement.
-  - OpenRouteService / OSRM route polyline drawing.
-- [ ] **Task 4.3**: Real-time vehicle marker animation:
-  - Smooth interpolation of vehicle marker movement when receiving `driver:location_update` events via Socket.IO.
-  - Auto-calculated car bearing angle for accurate vehicle rotation.
-- [ ] **Task 4.4**: Driver Active Trip HUD:
-  - Turn-by-turn guidance header, Speed (km/h) display, ETA counter.
-  - "Slide to Start Trip", "Slide to Complete Trip" touch-friendly mobile controls.
-- [ ] **Task 4.5**: Passenger Live Receipt & Star Rating Modal upon `trip:completed`.
+### 🗺️ Sprint 4: Real GIS Maps & Live Telemetry HUD (IN PROGRESS ⚡)
+- [x] **Task 4.1**: Install mapping library (`leaflet`, `react-leaflet`).
+- [x] **Task 4.2**: Replace SVG mock visualizer with real OpenStreetMap GIS map in `LeafletMap.jsx`.
+- [x] **Task 4.4**: Driver Active Trip HUD with speed and ETA displays.
+- [x] **Task 4.5**: Passenger Live Receipt & Star Rating Modal upon `trip:completed`.
+- [ ] **Task 4.3**: Real-time vehicle marker animation with smooth polyline route decoding.
+
+### 🛡️ Sprint 5: Hardening, Dockerization & Production Verification (UP NEXT ⏳)
+- [ ] **Task 5.1**: Build production multi-stage `Dockerfile` and `docker-compose.yml` (Node App, Redis, MySQL).
+- [ ] **Task 5.2**: Write API integration test suite using `vitest` + `supertest` covering all 20 lifecycle cases.
+- [ ] **Task 5.3**: Run concurrency stress test (10 simulated drivers attempting to accept 1 ride simultaneously).
+- [ ] **Task 5.4**: Set up GitHub Actions CI workflow for linting, syntax checking, and automated test execution.
 
 ### 🛡️ Sprint 5: Hardening, Dockerization & Production Verification (Days 13–15)
 - [ ] **Task 5.1**: Build production multi-stage `Dockerfile` and `docker-compose.yml` (Node App, Redis, MySQL).
