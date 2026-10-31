@@ -4,7 +4,11 @@ import Login from './pages/auth/Login';
 import PassengerDashboard from './pages/passenger/Dashboard';
 import BookRide from './pages/passenger/BookRide';
 import ActiveTrip from './pages/passenger/ActiveTrip';
+import PassengerHistory from './pages/passenger/History';
+import PassengerProfile from './pages/passenger/Profile';
 import DriverDashboard from './pages/driver/Dashboard';
+import DriverVehicles from './pages/driver/Vehicles';
+import DriverEarnings from './pages/driver/Earnings';
 import AdminDashboard from './pages/admin/Dashboard';
 import SuperadminDashboard from './pages/superadmin/Dashboard';
 import ProtectedRoute from './components/ui/ProtectedRoute';
@@ -50,6 +54,22 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/passenger/history"
+            element={
+              <ProtectedRoute role="passenger">
+                <PassengerHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/passenger/profile"
+            element={
+              <ProtectedRoute role="passenger">
+                <PassengerProfile />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Driver Routes */}
           <Route
@@ -57,6 +77,22 @@ export default function App() {
             element={
               <ProtectedRoute role="driver">
                 <DriverDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver/vehicles"
+            element={
+              <ProtectedRoute role="driver">
+                <DriverVehicles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver/earnings"
+            element={
+              <ProtectedRoute role="driver">
+                <DriverEarnings />
               </ProtectedRoute>
             }
           />

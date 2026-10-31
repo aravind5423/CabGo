@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { useTripStore } from '../../store/tripStore';
+import LeafletMap from '../../components/map/LeafletMap';
 import {
   ArrowLeft, MapPin, Navigation, Car, Loader2, AlertCircle, Eye, XCircle, CheckCircle, Sparkles
 } from 'lucide-react';
@@ -301,6 +302,22 @@ export default function BookRide() {
                   <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 font-medium">
                     Instant Dispatch
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Route Map Preview */}
+            {form.pickup_location.trim() && form.destination.trim() && (
+              <div className="space-y-2">
+                <div className="text-xs text-[hsl(220,10%,60%)] font-semibold uppercase tracking-wider flex items-center justify-between">
+                  <span>🗺️ Route Overview</span>
+                  <span className="text-[11px] text-emerald-400">Interactive GIS Preview</span>
+                </div>
+                <div className="rounded-2xl overflow-hidden border border-[hsl(220,15%,24%)] h-64 bg-[hsl(220,15%,12%)]">
+                  <LeafletMap
+                    pickupCoords={form.pickup_location}
+                    dropCoords={form.destination}
+                  />
                 </div>
               </div>
             )}

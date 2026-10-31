@@ -236,8 +236,13 @@ export default function ActiveTrip() {
 
         {/* Live Interactive Leaflet Map */}
         <div className="rounded-2xl overflow-hidden border border-[hsl(220,15%,24%)] bg-[hsl(220,15%,14%)]">
-          <div className="h-72">
-            <LeafletMap driverCoords={driverLocation || [13.0827, 80.2707]} />
+          <div className="h-80">
+            <LeafletMap
+              pickupCoords={currentRide.pickup_location}
+              dropCoords={currentRide.destination}
+              driverCoords={driverLocation || (telemetry ? [telemetry.lat, telemetry.lng] : null)}
+              bearing={telemetry?.bearing || 0}
+            />
           </div>
         </div>
 

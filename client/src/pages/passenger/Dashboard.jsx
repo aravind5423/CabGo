@@ -40,15 +40,55 @@ export default function PassengerDashboard() {
     <div className="min-h-screen bg-[hsl(220,15%,10%)] pb-12">
       {/* Navbar */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[hsl(220,15%,24%)] bg-[hsl(220,15%,10%)]/95 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🚖</span>
-          <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
-          <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-cyan-900/40 text-cyan-400 border border-cyan-500/30">
-            Passenger
-          </span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚖</span>
+            <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
+            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-cyan-900/40 text-cyan-400 border border-cyan-500/30">
+              Passenger
+            </span>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1 text-xs font-semibold">
+            <Link
+              to="/passenger/dashboard"
+              className="px-3 py-1.5 rounded-lg bg-[hsl(220,15%,18%)] text-white"
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/passenger/book-ride"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              Book Ride
+            </Link>
+            <Link
+              to="/passenger/active-trip"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              Active Trip
+            </Link>
+            <Link
+              to="/passenger/history"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              History
+            </Link>
+            <Link
+              to="/passenger/profile"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              Profile
+            </Link>
+          </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[hsl(220,10%,60%)] text-sm hidden sm:block">👋 {user?.name}</span>
+          <Link
+            to="/passenger/profile"
+            className="text-[hsl(220,10%,60%)] hover:text-white text-sm hidden sm:block font-medium"
+          >
+            👋 {user?.name}
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] border border-transparent hover:border-[hsl(220,15%,24%)] transition cursor-pointer"

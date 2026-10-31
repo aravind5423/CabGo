@@ -10,6 +10,7 @@
     "dev:client": "npm run dev --prefix client",
     "build:client": "npm run build --prefix client",
     "test": "node e2e_test.js",
+    "test:browser": "npm run test:e2e --prefix client",
     "db:setup": "node scripts/setup-tidb.js"
   },
   "dependencies": {

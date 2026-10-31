@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { useTripStore } from '../../store/tripStore';
@@ -162,12 +162,35 @@ export default function DriverDashboard() {
 
       {/* Navbar */}
       <nav className="sticky top-0 z-40 flex items-center justify-between px-6 py-4 border-b border-[hsl(220,15%,24%)] bg-[hsl(220,15%,10%)]/95 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🚖</span>
-          <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
-          <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-500/30">
-            Driver Partner
-          </span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🚖</span>
+            <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
+            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-500/30">
+              Driver Partner
+            </span>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1 text-xs font-semibold">
+            <Link
+              to="/driver/dashboard"
+              className="px-3 py-1.5 rounded-lg bg-[hsl(220,15%,18%)] text-white"
+            >
+              Console
+            </Link>
+            <Link
+              to="/driver/vehicles"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              Vehicles Fleet
+            </Link>
+            <Link
+              to="/driver/earnings"
+              className="px-3 py-1.5 rounded-lg text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition"
+            >
+              Earnings
+            </Link>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
@@ -343,8 +366,12 @@ export default function DriverDashboard() {
             </span>
             <span className="text-xs text-[hsl(220,10%,50%)]">OpenStreetMap + Leaflet GIS</span>
           </div>
-          <div className="h-72">
-            <LeafletMap driverCoords={driverLocation || [13.0827, 80.2707]} />
+          <div className="h-80">
+            <LeafletMap
+              pickupCoords={activeTrip?.pickup_location}
+              dropCoords={activeTrip?.destination}
+              driverCoords={driverLocation || [13.0827, 80.2707]}
+            />
           </div>
         </div>
 
