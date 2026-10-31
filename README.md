@@ -1,159 +1,136 @@
-# 🚖 Rydio — Modern Multi-Tenant Urban Transit & Dispatch Platform
+# Rydio — Cab Booking & Dispatch Platform
 
-> **Modern Enterprise Architecture**: React 19 SPA · Node.js & Express.js · Socket.IO Real-Time Engine · Leaflet GIS Maps · MySQL / TiDB Cloud Serverless  
-> **Strict Language Standard**: Pure Modern JavaScript (ES Modules, JSX) — Zero TypeScript compilation overhead.
-
----
-
-## 🌟 Platform Highlights
-
-**Rydio** is a full-featured, multi-tenant urban transit dispatch and cab booking platform engineered with pure modern JavaScript across both client and server tiers.
-
-- **4 Specialized Portals**: Dedicated workspaces for Passengers, Driver Partners, Operations Admins, and Super Administrators.
-- **Race-Condition Free Dispatch**: Atomic Compare-and-Swap SQL queries (`UPDATE ... WHERE request_id = ? AND status = 'pending'`) eliminate double-booking edge cases under high concurrent driver loads.
-- **Real-Time Telemetry**: Bidirectional Socket.IO event gateway for instantaneous ride dispatch, driver GPS beaconing, and status synchronization.
-- **Interactive GIS HUD**: Embedded Leaflet + OpenStreetMap canvas rendering pickup/destination pins, live driver location, and route segments.
-- **Tri-Modal Relational Database Adapter**: Seamless fallback across TiDB Cloud Serverless, local MySQL 2 connection pools, and zero-config in-memory relational AlaSQL for instant developer onboarding.
-- **Unified Full-Stack Dev Workflow**: Run backend API (Port 5000) and frontend Vite HMR (Port 5173) in one synchronized terminal with reverse proxying.
+> React 19 SPA · Node.js / Express · Socket.IO + Server-Sent Events · Leaflet maps · MySQL / TiDB Cloud (with in-memory fallback)
+> Plain modern JavaScript on both tiers (ES modules + JSX on the client, CommonJS on the server).
 
 ---
 
-## 👥 The 4 Multi-Tenant Portals
+## What it does
 
-| Portal | Target Role | Key Capabilities |
+Rydio is a multi-role cab booking platform with four portals that share one API:
+
+| Portal | Role | Capabilities |
 | :--- | :--- | :--- |
-| **Passenger** | Commuter | Search rides, calculate real road fares, request cabs, track driver live on GIS map, settle payments, submit 5-star ratings. |
-| **Driver Partner** | Fleet Operator | Online/Offline toggle, live dispatch radar, atomic ride claim, turn-by-turn simulation, daily earnings summary. |
-| **Operations Admin** | City Dispatcher | System health KPIs, driver document approvals, vehicle fleet audits, and dynamic Fare Rules Matrix pricing controls. |
-| **Super Admin** | Platform Executive | Executive telemetry, platform policies (commission rates, cancellation fee caps), admin RBAC provisioning, and immutable audit logs. |
+| **Passenger** | Commuter | Fare quotes for every vehicle type, booking, live trip tracking on a map, cancel, trip history with receipts, driver ratings, profile. |
+| **Driver** | Driver partner | Go online/offline, see matching ride requests, accept / start / complete trips, live route map, earnings by period, vehicle management. |
+| **Operations** | Admin | Platform KPIs, recent trips and activity, driver verification (approve / reject / block), editable fare rules. |
+| **Control panel** | Super admin | Platform-wide overview, platform settings (commission, tax, limits, maintenance mode), admin account provisioning, paginated audit log. |
+
+Key behaviours:
+
+- **Verified drivers only.** New drivers register as `pending` and cannot go online or accept rides until an admin approves them.
+- **Race-free dispatch.** Accepting a ride is a conditional `UPDATE … WHERE status = 'pending'`; a second driver gets a 409.
+- **Server-priced fares.** Quotes and bookings are recomputed on the server from the active fare rules and road distance (OpenRouteService if a key is set, otherwise a haversine estimate over Chennai landmarks).
+- **Live tracking.** During a trip the server simulates GPS telemetry and streams it over SSE; the driver app relays its position through Socket.IO to the passenger's trip room.
+- **Database fallback.** The server uses TiDB Cloud or local MySQL when configured and otherwise an in-memory relational engine seeded from `database/`. Any fallback is logged.
 
 ---
 
-## 🔑 Pre-Seeded Test Credentials
+## Demo accounts
 
-The login screen includes one-click quick-fill buttons for instant evaluation:
+The login page has one-click buttons for these accounts. They also accept the shared shortcut password `password123`. Every other account must use its own password.
 
-| Role | Username | Password | Default Portal Route |
-| :--- | :--- | :--- | :--- |
-| **Passenger** | `passenger1` | `password123` | `/passenger` |
-| **Driver** | `driver1` | `password123` | `/driver` |
-| **Operations Admin** | `admin1` | `password123` | `/admin` |
-| **Super Administrator** | `superadmin` | `password123` | `/superadmin` |
+| Role | Login (email or handle) | Password |
+| :--- | :--- | :--- |
+| Passenger | `passenger1@cab.com` / `passenger1` | `Pass@123` |
+| Driver | `driver1@cab.com` / `driver1` | `Driver@123` |
+| Operations admin | `admin@cab.com` / `admin1` | `Admin@123` |
+| Super admin | `superadmin@cab.com` / `superadmin` | `SuperAdmin@123` |
+
+Additional seeded users: `driver2`–`driver5`, `passenger2`–`passenger5`, `admin2` (same role passwords).
 
 ---
 
-## 🚀 Quick Start Guide
+## Getting started
 
-### 1. Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- *(Optional)* MySQL v8.0 or TiDB Cloud Serverless account (platform automatically falls back to in-memory database if no database is configured).
-
-### 2. Installation
-Install dependencies for both root and the client SPA:
+**Prerequisites:** Node.js 18+ and npm 9+. A MySQL 8 or TiDB Cloud database is optional.
 
 ```bash
-# Install root backend dependencies
+# 1. Install dependencies (server + client)
 npm install
+npm install --prefix client
 
-# Install client SPA dependencies
-cd client
-npm install
-cd ..
-```
-
-### 3. Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
+# 2. Configure (optional — defaults use the in-memory database)
 cp .env.example .env
-```
-*(Configure database credentials or OpenRouteService API key if using real road networks; defaults work out of the box).*
 
-### 4. Running Development Mode
-Launch both the Express backend API (`http://localhost:5000`) and the React Vite client (`http://localhost:5173`) concurrently:
-```bash
+# 3. Run in development (API on :5000, Vite client on :5173 with proxy)
 npm run dev
 ```
 
-Visit **`http://localhost:5173`** in your browser.
+Open **http://localhost:5173**.
 
-### 5. Running Production Build
-Compile the React 19 frontend into optimized static assets and serve directly from Express:
+**Production build** (Express serves the compiled client and the API from one origin):
+
 ```bash
 npm run build:client
-npm start
+npm start          # http://localhost:5000
 ```
 
-Visit **`http://localhost:5000`** in your browser.
+### Environment variables (`.env`)
+
+| Variable | Purpose |
+| :--- | :--- |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL / TiDB connection. A non-local host is treated as TiDB Cloud (TLS). |
+| `DATABASE_URL` | Alternative single connection URL for TiDB. |
+| `SERVER_PORT` | API port (default `5000`). |
+| `TOKEN_SECRET` | HMAC secret for auth tokens. Change this. |
+| `OPENROUTESERVICE_API_KEY` | Optional. Enables real road-distance routing for fare quotes. |
+
+To create the schema and seed a cloud database: `npm run db:setup`.
 
 ---
 
-## 🧪 Automated Verification Suite
-
-Run the full end-to-end integration test suite verifying all 20 lifecycle steps across authentication, ride booking, driver acceptance, active trip simulation, ratings, admin KPIs, and superadmin policies:
+## Testing
 
 ```bash
-npm test
+npm test               # API lifecycle suite (44 checks) — boots the server itself
+npm run build:client   # required once before the browser suite
+npm run test:browser   # Playwright browser suite against the built app on :5000
 ```
 
-Expected output:
-```
-═══════════════════════════════════
-  ALL 20 TESTS PASSED — E2E complete!
-═══════════════════════════════════
-```
+The API suite covers registration, login rules, fare quotes, booking, the full driver trip lifecycle, payments, ratings, history, profile, vehicles, driver verification, admin stats and fare rules, and super-admin settings, admins and logs.
 
 ---
 
-## 📁 Repository Structure
+## Project structure
 
 ```
 webTechProjectCIA/
-├── client/                           # React 19 Single Page Application
-│   ├── public/                       # Static SVGs & favicon
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── map/LeafletMap.jsx    # Leaflet OpenStreetMap canvas
-│   │   │   └── ui/ProtectedRoute.jsx # RBAC authentication guard
-│   │   ├── pages/
-│   │   │   ├── admin/Dashboard.jsx   # Operations Admin portal
-│   │   │   ├── auth/Login.jsx        # Unified multi-role login
-│   │   │   ├── driver/Dashboard.jsx  # Driver Partner HUD
-│   │   │   ├── passenger/            # Commuter booking & trip HUD
-│   │   │   └── superadmin/           # Super Administrator console
-│   │   ├── services/                 # Axios API & Socket.IO client
-│   │   ├── store/                    # Zustand state management
-│   │   ├── App.jsx                   # React Router route tree
-│   │   └── main.jsx                  # React 19 DOM entrypoint
-│   ├── index.html                    # SPA HTML shell
-│   ├── package.json                  # Frontend dependencies (React 19, Tailwind v4)
-│   └── vite.config.js                # Vite config with API reverse proxy
-├── database/
-│   ├── schema.sql                    # 13 relational MySQL schema tables
-│   └── seed.sql                      # Pre-seeded test users, vehicles & trips
-├── scripts/
-│   ├── setup-tidb.js                 # Automated cloud schema migration
-│   └── seed-tidb.js                  # Automated cloud data seeding
+├── client/                        # React 19 + Vite + Tailwind v4
+│   ├── e2e/                       # Playwright browser tests
+│   └── src/
+│       ├── components/map/        # Leaflet route map
+│       ├── components/ui/         # App shell, sidebar, UI kit (cards, tables, modal, toast…)
+│       ├── pages/{auth,passenger,driver,admin,superadmin}/
+│       ├── services/              # axios client (same-origin /api), Socket.IO client
+│       ├── store/                 # Zustand auth + trip state (persisted)
+│       └── utils/format.js        # date / currency / distance formatting
+├── database/                      # schema.sql, seed.sql (13 tables)
+├── scripts/                       # TiDB setup & seed scripts
 ├── server/
-│   ├── middleware/                   # Auth, rate limiting, logging, validation
-│   ├── routes/                       # Express route controllers for all 4 roles
-│   ├── schemas/                      # Zod validation schemas
-│   ├── utils/                        # Dynamic fare & pricing calculators
-│   ├── db.js                         # Tri-modal database connector
-│   ├── router.js                     # Legacy compatibility routing layer
-│   ├── server.js                     # Express + Socket.IO server entrypoint
-│   ├── sseBroker.js                  # SSE fallback stream broker
-│   └── telemetry.js                  # Vehicle GPS simulation generator
-├── .env.example                      # Configuration template
-├── .gitignore                        # Git ignore patterns
-├── e2e_test.js                       # 20-step automated E2E lifecycle test runner
-├── package.json                      # Backend dependencies & dev runner
-└── PRODUCTION_MIGRATION_PLAN.md      # Master architecture specification & roadmap
+│   ├── middleware/                # auth tokens, rate limiting, audit logging
+│   ├── routes/                    # auth, passenger, driver, payments, ratings, admin, superadmin, stream (SSE)
+│   ├── utils/fareCalculator.js    # distance + fare computation
+│   ├── db.js                      # TiDB / MySQL / in-memory adapter
+│   ├── sseBroker.js               # SSE subscriptions & broadcasts
+│   ├── telemetry.js               # trip GPS simulation
+│   └── server.js                  # Express + Socket.IO entry point
+├── e2e_test.js                    # API lifecycle test runner
+└── PRODUCTION_MIGRATION_PLAN.md   # Architecture notes & roadmap
 ```
 
 ---
 
-## 📋 Technical Documentation & Migration Roadmap
+## API overview
 
-For complete technical specifications, Socket.IO event signatures, concurrency safeguards, Redis GEO proximity dispatch designs, and Docker configurations, refer to:
-- 📖 **[PRODUCTION_MIGRATION_PLAN.md](PRODUCTION_MIGRATION_PLAN.md)**
+All routes are prefixed with `/api` and, except for `auth/*`, `health` and `rides/search`, require `Authorization: Bearer <token>`.
+
+| Area | Routes |
+| :--- | :--- |
+| Auth | `POST auth/register`, `POST auth/login`, `POST auth/logout`, `GET auth/me` |
+| Passenger | `GET rides/search`, `POST rides/book`, `GET rides/status/:id`, `POST rides/cancel/:id`, `GET rides/history`, `GET/PUT passenger/profile`, `GET passenger/dashboard`, `GET passenger/payments` |
+| Driver | `PUT driver/availability`, `GET driver/dashboard`, `GET driver/ride-requests`, `PUT driver/ride-requests/:id/accept|reject`, `PUT driver/trips/:id/start|complete`, `GET driver/earnings`, `GET/POST/PUT/DELETE driver/vehicles` |
+| Shared | `POST ratings`, `GET ratings/trip/:id`, `GET payments/trip/:id` |
+| Admin | `GET admin/stats`, `GET admin/drivers`, `PUT admin/drivers/:id/approve|reject|block|unblock`, `GET/POST/PUT/DELETE admin/fare-rules`, `GET admin/trips`, `GET admin/vehicles`, `GET admin/reports/*` |
+| Super admin | `GET superadmin/overview`, `GET/PUT superadmin/settings`, `GET/POST/PUT/DELETE superadmin/admins`, `GET superadmin/logs` |
+| Streams | `GET stream/trip/:id`, `GET stream/driver-dispatch`, `GET stream/admin-live` (SSE, token via `?token=`) |

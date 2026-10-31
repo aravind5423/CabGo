@@ -1,5 +1,8 @@
 import { io } from 'socket.io-client';
 
-export const socket = io('http://localhost:5000', {
+// Same-origin Socket.IO client. Vite proxies /socket.io in development.
+export const socket = io({
   autoConnect: false,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 2000,
 });

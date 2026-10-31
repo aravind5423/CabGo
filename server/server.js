@@ -149,8 +149,6 @@ app.use('/api', (req, res, next) => {
 // We delegate matching to it so all route files stay unchanged.
 app.use('/api', async (req, res, next) => {
   // Patch req.url so custom Router sees the full /api/... path
-  const fullReq = { ...req, url: '/api' + req.path, method: req.method, headers: req.headers };
-  // We need the real req to stay patched, so mutate req.url temporarily
   const origUrl = req.url;
   req.url = '/api' + req.path;
 
@@ -226,7 +224,7 @@ try {
 }
 
 server.listen(PORT, () => {
-  console.log(`\n🚖 Cab Booking Server running → http://localhost:${PORT}\n`);
+  console.log(`\nRydio server running → http://localhost:${PORT}\n`);
 });
 
 module.exports = { server, io, sendJSON, readBody }; // exported for route files

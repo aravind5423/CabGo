@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from './pages/auth/Login';
 import PassengerDashboard from './pages/passenger/Dashboard';
@@ -11,16 +11,19 @@ import DriverVehicles from './pages/driver/Vehicles';
 import DriverEarnings from './pages/driver/Earnings';
 import AdminDashboard from './pages/admin/Dashboard';
 import SuperadminDashboard from './pages/superadmin/Dashboard';
-import ProtectedRoute from './components/ui/ProtectedRoute';
+import ProtectedRoute, { HomeRedirect } from './components/ui/ProtectedRoute';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 30,
+      staleTime: 10 * 1000,
       retry: 1,
+      refetchOnWindowFocus: false,
     },
   },
 });
+
+const guard = (role, element) => <ProtectedRoute role={role}>{element}</ProtectedRoute>;
 
 export default function App() {
   return (
@@ -29,96 +32,26 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
 
-          {/* Passenger Routes */}
-          <Route
-            path="/passenger/dashboard"
-            element={
-              <ProtectedRoute role="passenger">
-                <PassengerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/passenger/book-ride"
-            element={
-              <ProtectedRoute role="passenger">
-                <BookRide />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/passenger/active-trip"
-            element={
-              <ProtectedRoute role="passenger">
-                <ActiveTrip />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/passenger/history"
-            element={
-              <ProtectedRoute role="passenger">
-                <PassengerHistory />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/passenger/profile"
-            element={
-              <ProtectedRoute role="passenger">
-                <PassengerProfile />
-              </ProtectedRoute>
-            }
-          />
+          {/* Passenger */}
+          <Route path="/passenger/dashboard"   element={guard('passenger', <PassengerDashboard />)} />
+          <Route path="/passenger/book-ride"   element={guard('passenger', <BookRide />)} />
+          <Route path="/passenger/active-trip" element={guard('passenger', <ActiveTrip />)} />
+          <Route path="/passenger/history"     element={guard('passenger', <PassengerHistory />)} />
+          <Route path="/passenger/profile"     element={guard('passenger', <PassengerProfile />)} />
 
-          {/* Driver Routes */}
-          <Route
-            path="/driver/dashboard"
-            element={
-              <ProtectedRoute role="driver">
-                <DriverDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/vehicles"
-            element={
-              <ProtectedRoute role="driver">
-                <DriverVehicles />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/driver/earnings"
-            element={
-              <ProtectedRoute role="driver">
-                <DriverEarnings />
-              </ProtectedRoute>
-            }
-          />
+          {/* Driver */}
+          <Route path="/driver/dashboard" element={guard('driver', <DriverDashboard />)} />
+          <Route path="/driver/vehicles"  element={guard('driver', <DriverVehicles />)} />
+          <Route path="/driver/earnings"  element={guard('driver', <DriverEarnings />)} />
 
-          {/* Admin Routes */}
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
+          {/* Admin (superadmin may also access) */}
+          <Route path="/admin/dashboard" element={guard('admin', <AdminDashboard />)} />
 
-          {/* Superadmin Routes */}
-          <Route
-            path="/superadmin/dashboard"
-            element={
-              <ProtectedRoute role="superadmin">
-                <SuperadminDashboard />
-              </ProtectedRoute>
-            }
-          />
+          {/* Superadmin */}
+          <Route path="/superadmin/dashboard" element={guard('superadmin', <SuperadminDashboard />)} />
 
-          {/* Default redirect */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Default */}
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

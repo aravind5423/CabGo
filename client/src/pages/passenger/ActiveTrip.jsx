@@ -1,123 +1,147 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../services/api';
+import { api, streamUrl, errorMessage } from '../../services/api';
 import { useTripStore } from '../../store/tripStore';
 import { socket } from '../../services/socket';
 import LeafletMap from '../../components/map/LeafletMap';
 import AppShell from '../../components/ui/AppShell';
-import { StatusBadge, EmptyState, Spinner } from '../../components/ui/UIKit';
-import {
-  Navigation, Clock, XCircle, Loader2, MapPin, Car, Star, CheckCircle2, Award,
-  Phone, Zap, ShieldCheck, Radio
-} from 'lucide-react';
+import { StatusBadge, EmptyState, Spinner, Alert, IconChip } from '../../components/ui/UIKit';
+import { Navigation, XCircle, MapPin, Car, Star, CheckCircle2, Phone, Clock, Gauge } from 'lucide-react';
+import { formatCurrency, formatDistance, capitalize, initials } from '../../utils/format';
 import clsx from 'clsx';
+
+const STEPS = [
+  { key: 'pending',     label: 'Finding driver' },
+  { key: 'accepted',    label: 'Driver on the way' },
+  { key: 'in_progress', label: 'Trip in progress' },
+  { key: 'completed',   label: 'Arrived' },
+];
+const STEP_INDEX = { pending: 0, accepted: 1, in_progress: 2, completed: 3 };
+
+const HEADLINES = {
+  pending:     'Looking for a nearby driver…',
+  accepted:    'Your driver is on the way to the pickup point',
+  in_progress: 'Trip in progress — heading to your destination',
+  completed:   'You have arrived. Thanks for riding with Rydio.',
+  cancelled:   'This ride was cancelled.',
+};
 
 export default function ActiveTrip() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { activeTrip: storeActiveTrip, driverLocation, setDriverLocation, clearActiveTrip } = useTripStore();
-  const [sseStatus, setSseStatus] = useState('connecting');
+  const { activeTrip: storedTrip, setActiveTrip, clearActiveTrip } = useTripStore();
+
   const [telemetry, setTelemetry] = useState(null);
+  const [streamState, setStreamState] = useState('idle'); // idle | live | reconnecting
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const eventSourceRef = useRef(null);
+  const [ratingError, setRatingError] = useState('');
 
   const { data: dashboardData } = useQuery({
     queryKey: ['passengerDashboard'],
     queryFn: () => api.get('/passenger/dashboard').then((r) => r.data),
-    refetchInterval: 3000,
+    refetchInterval: 4000,
   });
 
-  const activeRide = dashboardData?.activeRide || storeActiveTrip;
-  const requestId = activeRide?.request_id;
+  const activeRide = dashboardData?.activeRide || null;
+  const requestId  = activeRide?.request_id || storedTrip?.request_id || null;
 
-  const { data: statusData } = useQuery({
+  // Remember the current ride so a reload still shows this page (incl. the rating prompt).
+  useEffect(() => {
+    if (activeRide && activeRide.request_id !== storedTrip?.request_id) setActiveTrip(activeRide);
+  }, [activeRide, storedTrip?.request_id, setActiveTrip]);
+
+  const { data: statusData, error: statusError } = useQuery({
     queryKey: ['rideStatus', requestId],
     queryFn: () => api.get(`/rides/status/${requestId}`).then((r) => r.data),
     enabled: !!requestId,
-    refetchInterval: 3000,
+    refetchInterval: (q) => (['completed', 'cancelled'].includes(q.state.data?.status) ? false : 3000),
+    retry: false,
   });
 
-  const currentRide = statusData?.ride || statusData?.request || activeRide;
-  const trip = statusData?.trip || currentRide?.trip || null;
-  const tripId = trip?.trip_id || currentRide?.trip_id;
-  const status = trip?.trip_status || currentRide?.status || 'pending';
-
-  // Real-time SSE and Socket.IO bindings
   useEffect(() => {
-    if (!requestId) return;
-    const token = localStorage.getItem('cab_token');
-    const targetId = tripId || requestId;
-    const url = `http://localhost:5000/api/stream/trip/${targetId}?token=${token}`;
-    const es = new EventSource(url);
-    eventSourceRef.current = es;
-    es.onopen = () => setSseStatus('live');
-    es.onerror = () => setSseStatus('polling');
-    es.addEventListener('location', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        setDriverLocation([data.lat, data.lng]);
-        setTelemetry(data);
-      } catch (_) {}
-    });
-    es.addEventListener('status', () => {
-      queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
+    if (statusError?.response?.status === 404) clearActiveTrip();
+  }, [statusError, clearActiveTrip]);
+
+  const ride   = statusData?.ride || activeRide || storedTrip || null;
+  const trip   = statusData?.trip || null;
+  const tripId = trip?.trip_id || activeRide?.trip_id || null;
+  const status = trip?.trip_status || ride?.status || 'pending';
+
+  // Has this trip been rated already?
+  const { data: ratingData } = useQuery({
+    queryKey: ['tripRating', tripId],
+    queryFn: () => api.get(`/ratings/trip/${tripId}`).then((r) => r.data),
+    enabled: !!tripId && status === 'completed',
+  });
+  const alreadyRated = ratingData?.rated === true;
+
+  // Live telemetry: SSE from the server simulation + Socket.IO room updates.
+  useEffect(() => {
+    if (!tripId || ['completed', 'cancelled'].includes(status)) { setStreamState('idle'); return undefined; }
+
+    const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['rideStatus', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
+    };
+
+    const es = new EventSource(streamUrl(`/stream/trip/${tripId}`));
+    es.onopen  = () => setStreamState('live');
+    es.onerror = () => setStreamState('reconnecting');
+    es.addEventListener('telemetry', (e) => {
+      try { setTelemetry(JSON.parse(e.data)); } catch { /* ignore malformed frame */ }
     });
+    ['trip_started', 'trip_completed', 'ride_cancelled', 'trip_arrived', 'trip_status'].forEach((evt) => es.addEventListener(evt, refresh));
 
     socket.connect();
-    socket.emit('trip:join', targetId);
-    socket.on('driver:location_tick', (data) => {
-      if (data.lat && data.lng) setDriverLocation([data.lat, data.lng]);
-    });
+    socket.emit('join:trip', tripId);
+    const onTick = (data) => {
+      if (data && Number(data.tripId) === Number(tripId) && data.lat && data.lng) {
+        setTelemetry((t) => ({ ...(t || {}), lat: data.lat, lng: data.lng, bearing: data.bearing ?? t?.bearing }));
+      }
+    };
+    socket.on('driver:location_tick', onTick);
 
     return () => {
       es.close();
-      socket.off('driver:location_tick');
+      socket.off('driver:location_tick', onTick);
       socket.disconnect();
     };
-  }, [requestId, tripId, queryClient, setDriverLocation]);
+  }, [tripId, status, requestId, queryClient]);
 
   const cancelMutation = useMutation({
     mutationFn: () => api.post(`/rides/cancel/${requestId}`),
     onSuccess: () => {
       clearActiveTrip();
       queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['passengerTrips'] });
       navigate('/passenger/dashboard');
     },
   });
 
   const ratingMutation = useMutation({
-    mutationFn: () =>
-      api.post('/ratings', {
-        trip_id: tripId,
-        rating: Number(rating),
-        comment: comment.trim() || 'Superb ride service!',
-      }),
+    mutationFn: () => api.post('/ratings', { trip_id: tripId, rating: Number(rating), comment: comment.trim() || undefined }),
     onSuccess: () => {
-      setRatingSubmitted(true);
       clearActiveTrip();
-      queryClient.invalidateQueries({ queryKey: ['passengerDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['passengerTrips'] });
-      setTimeout(() => navigate('/passenger/dashboard'), 2000);
+      queryClient.invalidateQueries({ queryKey: ['rideHistory'] });
+      navigate('/passenger/history');
     },
+    onError: (err) => setRatingError(errorMessage(err, 'Could not submit rating.')),
   });
 
-  if (!currentRide) {
+  if (!ride || status === 'cancelled') {
     return (
-      <AppShell title="Live Ride Radar" subtitle="No active trip in session">
-        <div className="max-w-md mx-auto mt-12 card p-8">
+      <AppShell title="Active trip" subtitle="No ride in progress">
+        <div className="max-w-md mx-auto mt-10 card">
           <EmptyState
             icon={Car}
-            title="No Ongoing Journeys"
-            description="You don't have any pending or active rides at the moment. Request a ride now to start tracking."
+            title={status === 'cancelled' ? 'Ride cancelled' : 'No active ride'}
+            description="You don't have a pending or ongoing ride right now."
             action={
-              <Link to="/passenger/book-ride" className="btn-primary text-sm shadow-md">
-                Book a Cab
-              </Link>
+              <div className="flex gap-2">
+                <Link to="/passenger/book-ride" className="btn-primary btn-sm">Book a ride</Link>
+                {status === 'cancelled' && <button onClick={clearActiveTrip} className="btn-secondary btn-sm">Dismiss</button>}
+              </div>
             }
           />
         </div>
@@ -125,237 +149,156 @@ export default function ActiveTrip() {
     );
   }
 
-  const STEPS = [
-    { key: 'pending',     label: 'Driver Matching', done: true },
-    { key: 'accepted',    label: 'Driver En Route', done: ['accepted', 'in_progress', 'completed'].includes(status) },
-    { key: 'in_progress', label: 'Trip In Progress', done: ['in_progress', 'completed'].includes(status) },
-    { key: 'completed',   label: 'Arrived at Destination', done: status === 'completed' },
-  ];
+  const stepIdx = STEP_INDEX[status] ?? 0;
+  const vehiclePos = telemetry?.lat && telemetry?.lng ? [telemetry.lat, telemetry.lng] : null;
+  const fare = trip?.fare ?? ride?.estimated_fare;
 
   return (
-    <AppShell title={`Live Trip #${currentRide.request_id}`} subtitle="Real-time vehicle telemetry stream">
-      <div className="max-w-4xl mx-auto space-y-6">
-
-        {/* Live Radar Header HUD */}
-        <div className="card p-5 bg-slate-900 text-white border-slate-800 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                <Radio size={22} className="animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                    {status === 'completed' ? 'Journey Completed' : 'Live GPS Radar Active'}
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                </div>
-                <div className="text-xl font-black mt-0.5 tracking-tight">
-                  {status === 'pending' && 'Searching for Nearest Available Driver...'}
-                  {status === 'accepted' && 'Driver Assigned — En Route to Pickup'}
-                  {status === 'in_progress' && 'Trip In Progress — Heading to Destination'}
-                  {status === 'completed' && 'You have arrived safely at your destination'}
-                </div>
-              </div>
-            </div>
-
+    <AppShell title={`Trip #${ride.request_id}`} subtitle={HEADLINES[status]}>
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Progress */}
+        <div className="card p-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl font-mono">
-                SSE: {sseStatus}
-              </span>
+              {status !== 'completed' && <span className="live-dot" />}
+              <div className="text-[15px] font-semibold text-slate-900">{HEADLINES[status]}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              {tripId && status !== 'completed' && (
+                <span className={clsx('badge', streamState === 'live' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'badge-neutral')}>
+                  {streamState === 'live' ? 'Live' : streamState === 'reconnecting' ? 'Reconnecting…' : 'Polling'}
+                </span>
+              )}
               <StatusBadge status={status} />
             </div>
           </div>
-
-          {/* Stepper Progress Bar */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {STEPS.map((step, idx) => (
-                <div key={step.key} className="flex flex-col gap-1.5">
-                  <div
-                    className={clsx(
-                      'h-1.5 rounded-full transition-all duration-500',
-                      step.done ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-slate-800'
-                    )}
-                  />
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                    <span className={clsx(step.done ? 'text-emerald-400' : 'text-slate-500')}>
-                      {idx + 1}. {step.label}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-4 gap-2 mt-5">
+            {STEPS.map((s, i) => (
+              <div key={s.key}>
+                <div className={clsx('h-1.5 rounded-full transition-colors', i <= stepIdx ? 'bg-emerald-500' : 'bg-slate-200')} />
+                <div className={clsx('text-[11px] font-medium mt-1.5', i <= stepIdx ? 'text-slate-900' : 'text-slate-400')}>{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Interactive Radar Leaflet Map */}
-        <div className="card overflow-hidden shadow-xl border-slate-200">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
-            <span className="flex items-center gap-2">
-              <Navigation size={14} className="text-emerald-600" /> Live Vehicle Position
-            </span>
-            <span className="text-[11px] text-slate-500">Live coordinates auto-refresh</span>
-          </div>
-          <div className="h-80 sm:h-96 w-full">
-            <LeafletMap
-              pickupCoords={currentRide.pickup_location}
-              dropCoords={currentRide.destination}
-              driverCoords={driverLocation || telemetry}
-              theme="voyager"
-              height="100%"
-            />
-          </div>
-        </div>
-
-        {/* Trip Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Route Specification */}
-          <div className="card p-6 space-y-4">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Journey Specifications</h3>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <MapPin size={16} />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Map */}
+          <div className="lg:col-span-3 card overflow-hidden">
+            <div className="card-header">
+              <div className="card-title flex items-center gap-2"><Navigation size={14} className="text-emerald-600" /> Live map</div>
+              {telemetry && status === 'in_progress' && (
+                <div className="flex items-center gap-4 text-xs text-slate-600">
+                  <span className="flex items-center gap-1"><Gauge size={13} /> {telemetry.speed_kmh ?? 0} km/h</span>
+                  <span className="flex items-center gap-1"><Clock size={13} /> ETA {telemetry.eta_minutes ?? '—'} min</span>
+                  <span>{telemetry.progress_percent ?? 0}%</span>
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase">Pickup Location</div>
-                  <div className="text-sm font-bold text-slate-900">{currentRide.pickup_location}</div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Navigation size={16} />
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase">Destination Drop-off</div>
-                  <div className="text-sm font-bold text-slate-900">{currentRide.destination}</div>
-                </div>
-              </div>
+              )}
             </div>
-
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold text-slate-400 uppercase">Estimated Fare</div>
-                <div className="text-2xl font-black text-slate-900">₹{currentRide.estimated_fare || trip?.fare || 250}</div>
-              </div>
-              <span className="badge bg-slate-100 text-slate-700 capitalize font-bold">
-                {currentRide.vehicle_type || 'Sedan'}
-              </span>
+            <div className="h-80 sm:h-[400px]">
+              <LeafletMap pickupCoords={ride.pickup_location} dropCoords={ride.destination} driverCoords={vehiclePos} bearing={telemetry?.bearing || 0} />
             </div>
           </div>
 
-          {/* Driver Partner / Actions */}
-          <div className="space-y-4">
+          {/* Details */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="card p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <IconChip icon={MapPin} tone="brand" size="sm" />
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Pickup</div>
+                  <div className="text-sm font-medium text-slate-900">{ride.pickup_location}</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <IconChip icon={Navigation} tone="rose" size="sm" />
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Destination</div>
+                  <div className="text-sm font-medium text-slate-900">{ride.destination}</div>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase">{status === 'completed' ? 'Final fare' : 'Estimated fare'}</div>
+                  <div className="text-2xl font-semibold text-slate-900">{formatCurrency(fare)}</div>
+                  {trip?.distance_km && <div className="text-xs text-slate-500">{formatDistance(trip.distance_km)}</div>}
+                </div>
+                <span className="badge badge-neutral">{capitalize(ride.vehicle_type)}</span>
+              </div>
+            </div>
+
             {trip?.driver_name ? (
-              <div className="card p-6 bg-gradient-to-br from-white to-slate-50">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white font-black text-xl flex items-center justify-center shadow-lg shadow-emerald-500/25 flex-shrink-0">
-                    {trip.driver_name[0]?.toUpperCase() || 'D'}
+              <div className="card p-5">
+                <div className="text-[11px] font-semibold text-slate-400 uppercase mb-3">Your driver</div>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 text-white font-semibold text-lg flex items-center justify-center flex-shrink-0">
+                    {initials(trip.driver_name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-slate-900 truncate">{trip.driver_name}</span>
-                      <ShieldCheck size={16} className="text-emerald-600" />
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {trip.vehicle_type?.toUpperCase() || 'SEDAN'} • {trip.vehicle_number || 'TN-09-DR-404'}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-amber-500 font-bold mt-1">
-                      <Star size={13} className="fill-amber-400 text-amber-400" />
-                      <span>4.9 Star Rating</span>
+                    <div className="text-sm font-semibold text-slate-900 truncate">{trip.driver_name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{trip.vehicle_model} · <span className="font-mono">{trip.vehicle_number}</span></div>
+                    <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold mt-1">
+                      <Star size={12} className="fill-amber-400 text-amber-400" /> {Number(trip.driver_rating || 0).toFixed(1)}
                     </div>
                   </div>
-                  {trip.driver_phone && (
-                    <a
-                      href={`tel:${trip.driver_phone}`}
-                      className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center hover:bg-emerald-100 transition shadow-sm"
-                    >
-                      <Phone size={18} />
-                    </a>
+                  {trip.driver_mobile && (
+                    <a href={`tel:${trip.driver_mobile}`} className="btn-secondary btn-sm" aria-label="Call driver"><Phone size={14} /></a>
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="card p-6 border-dashed border-slate-300 text-center space-y-2">
-                <Spinner size={24} className="text-emerald-600 mx-auto" />
-                <div className="text-xs font-bold text-slate-800">Assigning Closest Driver Partner</div>
-                <p className="text-[11px] text-slate-500">Drivers in your area have received this trip notification.</p>
+            ) : status === 'pending' ? (
+              <div className="card p-5 border-dashed text-center">
+                <Spinner size={22} className="text-emerald-600 mx-auto" />
+                <div className="text-sm font-semibold text-slate-900 mt-2">Matching you with a driver</div>
+                <p className="text-xs text-slate-500 mt-1">Nearby drivers with a matching vehicle have been notified.</p>
               </div>
-            )}
+            ) : null}
 
-            {/* Cancel Button */}
-            {(status === 'pending' || status === 'accepted') && (
-              <button
-                type="button"
-                onClick={() => cancelMutation.mutate()}
+            {['pending', 'accepted'].includes(status) && (
+              <button type="button"
+                onClick={() => window.confirm('Cancel this ride?') && cancelMutation.mutate()}
                 disabled={cancelMutation.isPending}
-                className="btn-danger w-full py-3 text-xs font-bold shadow-md shadow-rose-500/20"
-              >
-                {cancelMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-                Cancel This Ride Request
+                className="btn-danger-soft w-full">
+                {cancelMutation.isPending ? <Spinner size={15} /> : <XCircle size={15} />} Cancel ride
               </button>
             )}
           </div>
         </div>
 
-        {/* Rating Submission Card */}
         {status === 'completed' && (
-          <div className="card p-6 sm:p-8 space-y-5 animate-card-in border-emerald-500/30 bg-gradient-to-br from-white to-emerald-50/30 shadow-xl">
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-inner">
-                <Award size={28} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">How was your journey?</h3>
-              <p className="text-xs text-slate-500 mt-1">Rate your driver partner to keep our community safe and high-quality.</p>
-            </div>
-
-            {ratingSubmitted ? (
-              <div className="p-4 rounded-2xl bg-emerald-100 border border-emerald-200 text-emerald-800 text-sm font-bold text-center flex items-center justify-center gap-2">
-                <CheckCircle2 size={18} /> Thank you! Your rating has been submitted successfully.
+          <div className="card p-6 sm:p-8 animate-slide-in">
+            {alreadyRated ? (
+              <div className="flex flex-col items-center text-center gap-3">
+                <IconChip icon={CheckCircle2} tone="brand" size="lg" />
+                <div className="text-base font-semibold text-slate-900">Thanks, your rating was recorded.</div>
+                <div className="flex gap-2">
+                  <Link to="/passenger/history" className="btn-secondary btn-sm">View trip history</Link>
+                  <button onClick={() => { clearActiveTrip(); navigate('/passenger/book-ride'); }} className="btn-primary btn-sm">Book another ride</button>
+                </div>
               </div>
             ) : (
-              <div className="max-w-md mx-auto space-y-4">
-                <div className="flex items-center justify-center gap-3">
+              <div className="max-w-md mx-auto space-y-5">
+                <div className="text-center">
+                  <h3 className="text-base font-semibold text-slate-900">How was your trip?</h3>
+                  <p className="text-xs text-slate-500 mt-1">Rate {trip?.driver_name || 'your driver'} to help keep the community safe.</p>
+                </div>
+                {ratingError && <Alert type="error">{ratingError}</Alert>}
+                <div className="flex items-center justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      className="p-1.5 transition-all duration-200 hover:scale-120 cursor-pointer"
-                    >
-                      <Star
-                        size={32}
-                        className={clsx(
-                          'transition-colors',
-                          star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'
-                        )}
-                      />
+                    <button key={star} type="button" onClick={() => setRating(star)} aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                      className="p-1 transition-transform hover:scale-110">
+                      <Star size={30} className={clsx('transition-colors', star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300')} />
                     </button>
                   ))}
                 </div>
-
-                <input
-                  type="text"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Optional review note (e.g. Smooth driving, very polite)"
-                  className="input-field text-center"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => ratingMutation.mutate()}
-                  disabled={ratingMutation.isPending}
-                  className="btn-primary w-full py-3 font-bold shadow-lg shadow-emerald-500/25"
-                >
-                  {ratingMutation.isPending ? <Spinner size={16} className="text-white" /> : <Star size={16} />}
-                  Submit Rating ({rating} Stars)
-                </button>
+                <input type="text" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={1000}
+                  placeholder="Add a comment (optional)" className="input-field" />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { clearActiveTrip(); navigate('/passenger/dashboard'); }} className="btn-secondary flex-1">Skip</button>
+                  <button type="button" onClick={() => ratingMutation.mutate()} disabled={ratingMutation.isPending || !tripId} className="btn-primary flex-1">
+                    {ratingMutation.isPending ? <Spinner size={15} /> : <Star size={15} />} Submit rating
+                  </button>
+                </div>
               </div>
             )}
           </div>

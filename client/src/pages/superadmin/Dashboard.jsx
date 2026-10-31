@@ -1,319 +1,361 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
-import { Settings, ShieldAlert, FileText, CheckCircle2, Loader2, Key, AlertCircle, ShieldCheck, Search, Sliders } from 'lucide-react';
+import { api, errorMessage } from '../../services/api';
+import { Settings, ShieldCheck, FileText, Users, Car, Activity, Wallet, Search, Plus, UserCheck, UserX, LayoutDashboard, Save } from 'lucide-react';
 import AppShell from '../../components/ui/AppShell';
-import { EmptyState, Skeleton, StatusBadge, Toast, Spinner } from '../../components/ui/UIKit';
+import { KPICard, EmptyState, SkeletonKPIs, SkeletonRows, StatusBadge, Toast, useToast, Spinner, Tabs, Modal, Alert, Skeleton } from '../../components/ui/UIKit';
+import { formatCurrency, formatDate, capitalize, initials, timeAgo } from '../../utils/format';
 import clsx from 'clsx';
 
-export default function SuperadminDashboard() {
-  const { user } = useAuthStore();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('settings');
-  const [logSearch, setLogSearch] = useState('');
-  const [toastMsg, setToastMsg] = useState('');
-  const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
+const TABS = [
+  { id: 'overview', label: 'Overview',  icon: LayoutDashboard },
+  { id: 'settings', label: 'Settings',  icon: Settings },
+  { id: 'admins',   label: 'Admins',    icon: ShieldCheck },
+  { id: 'logs',     label: 'Audit log', icon: FileText },
+];
 
-  const { data: settingsData, isLoading: settingsLoading } = useQuery({
+export default function SuperadminDashboard() {
+  const queryClient = useQueryClient();
+  const [toast, showToast] = useToast();
+  const [tab, setTab] = useState('overview');
+
+  return (
+    <AppShell title="Control panel" subtitle="Platform settings, admin accounts and audit trail">
+      <Toast toast={toast} />
+      <div className="space-y-6">
+        <Tabs tabs={TABS} value={tab} onChange={setTab} />
+        {tab === 'overview' && <OverviewPanel />}
+        {tab === 'settings' && <SettingsPanel showToast={showToast} queryClient={queryClient} />}
+        {tab === 'admins'   && <AdminsPanel showToast={showToast} queryClient={queryClient} />}
+        {tab === 'logs'     && <LogsPanel />}
+      </div>
+    </AppShell>
+  );
+}
+
+/* ─── Overview ─────────────────────────────────────────────────── */
+function OverviewPanel() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['superadminOverview'],
+    queryFn: () => api.get('/superadmin/overview').then((r) => r.data),
+    refetchInterval: 20000,
+  });
+  const s = data?.stats || {};
+  const admins = data?.admins || [];
+  const logs = data?.recent_logs || [];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {isLoading ? <SkeletonKPIs /> : (
+          <>
+            <KPICard label="Users" value={s.users?.total ?? 0} icon={Users} tone="blue" hint={`${s.users?.passengers ?? 0} passengers · ${s.users?.drivers ?? 0} drivers`} />
+            <KPICard label="Fleet" value={s.fleet?.total ?? 0} icon={Car} tone="brand" hint={`${s.fleet?.active ?? 0} active vehicles · ${s.drivers?.online ?? 0} drivers online`} />
+            <KPICard label="Trips" value={s.trips?.total ?? 0} icon={Activity} tone="amber" hint={`${s.trips?.completed ?? 0} completed · ${s.trips?.cancelled ?? 0} cancelled`} />
+            <KPICard label="Revenue" value={formatCurrency(s.trips?.revenue ?? 0, { decimals: 0 })} icon={Wallet} tone="violet" hint={`${s.audit?.logs_today ?? 0} audit events today`} />
+          </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="card overflow-hidden">
+          <div className="card-header"><div className="card-title">Administrators</div><span className="text-xs text-slate-500">{admins.length} accounts</span></div>
+          {isLoading ? <SkeletonRows rows={3} /> : (
+            <ul className="divide-y divide-slate-100">
+              {admins.map((a) => (
+                <li key={a.user_id} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">{initials(a.name)}</div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium text-slate-900 truncate">{a.name}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{a.email} · {a.permissions_count} permission{a.permissions_count === 1 ? '' : 's'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2"><span className="badge badge-neutral">{capitalize(a.role)}</span><StatusBadge status={a.status} /></div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="card overflow-hidden">
+          <div className="card-header"><div className="card-title">Recent audit events</div></div>
+          {isLoading ? <SkeletonRows rows={5} /> : logs.length === 0 ? <EmptyState icon={FileText} title="No events" compact /> : (
+            <ul className="divide-y divide-slate-100">
+              {logs.map((l) => (
+                <li key={l.log_id} className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] font-semibold text-emerald-700">{l.action}</span>
+                    <span className="text-[11px] text-slate-400 whitespace-nowrap">{timeAgo(l.created_at)}</span>
+                  </div>
+                  <div className="text-xs text-slate-700 mt-0.5 line-clamp-2">{l.description}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{l.user_name} ({l.user_role})</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Settings ─────────────────────────────────────────────────── */
+const SETTINGS_FIELDS = [
+  { key: 'platform_name',        label: 'Platform name',             type: 'text' },
+  { key: 'operating_city',       label: 'Operating city',            type: 'text' },
+  { key: 'support_email',        label: 'Support email',             type: 'email' },
+  { key: 'support_phone',        label: 'Support phone',             type: 'text' },
+  { key: 'driver_commission_pct',label: 'Platform commission (%)',   type: 'number', min: 0, max: 60, step: 0.5, hint: 'Deducted from gross fares' },
+  { key: 'tax_pct',              label: 'Tax (%)',                   type: 'number', min: 0, max: 30, step: 0.5 },
+  { key: 'max_cancellations',    label: 'Max cancellations per day', type: 'number', min: 1, max: 20, step: 1 },
+  { key: 'booking_timeout_sec',  label: 'Booking timeout (seconds)', type: 'number', min: 15, max: 300, step: 5 },
+];
+
+function SettingsPanel({ showToast, queryClient }) {
+  const { data, isLoading } = useQuery({
     queryKey: ['superadminSettings'],
     queryFn: () => api.get('/superadmin/settings').then((r) => r.data),
   });
+  const settings = data?.settings;
+  const [form, setForm] = useState(null);
 
-  const { data: logsData, isLoading: logsLoading } = useQuery({
-    queryKey: ['superadminLogs'],
-    queryFn: () => api.get('/superadmin/logs').then((r) => r.data),
-    enabled: activeTab === 'logs',
+  useEffect(() => { if (settings) setForm({ ...settings }); }, [settings]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.put('/superadmin/settings', {
+      platform_name: form.platform_name,
+      operating_city: form.operating_city,
+      support_email: form.support_email,
+      support_phone: form.support_phone,
+      driver_commission_pct: Number(form.driver_commission_pct),
+      tax_pct: Number(form.tax_pct),
+      max_cancellations: Number(form.max_cancellations),
+      booking_timeout_sec: Number(form.booking_timeout_sec),
+      maintenance_mode: Boolean(form.maintenance_mode),
+    }),
+    onSuccess: () => { showToast('Settings saved.'); queryClient.invalidateQueries({ queryKey: ['superadminSettings'] }); },
+    onError: (err) => showToast(errorMessage(err, 'Failed to save settings.'), 'error'),
   });
 
-  const { data: adminsData, isLoading: adminsLoading } = useQuery({
-    queryKey: ['superadminAdmins'],
-    queryFn: () => api.get('/superadmin/admins').then((r) => r.data),
-    enabled: activeTab === 'admins',
-  });
-
-  const currentSettings = settingsData?.settings || settingsData || {};
-
-  const [settingsForm, setSettingsForm] = useState({
-    commission_rate: 15,
-    max_cancellations_per_day: 3,
-    maintenance_mode: false,
-  });
-
-  useEffect(() => {
-    if (currentSettings && Object.keys(currentSettings).length > 0) {
-      setSettingsForm({
-        commission_rate: currentSettings.commission_rate ?? 15,
-        max_cancellations_per_day: currentSettings.max_cancellations_per_day ?? 3,
-        maintenance_mode: currentSettings.maintenance_mode ?? false,
-      });
-    }
-  }, [settingsData]);
-
-  const updateSettingsMutation = useMutation({
-    mutationFn: (payload) => api.put('/superadmin/settings', payload),
-    onSuccess: () => {
-      showToast('Global platform policies updated and applied.');
-      queryClient.invalidateQueries({ queryKey: ['superadminSettings'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to update settings'),
-  });
-
-  const logs = logsData?.logs || [];
-  const admins = adminsData?.admins || [];
-
-  const filteredLogs = logs.filter((l) => {
-    const q = logSearch.toLowerCase();
-    const action = (l.action || '').toLowerCase();
-    const desc = (l.description || '').toLowerCase();
-    const ip = (l.ip_address || '').toLowerCase();
-    return action.includes(q) || desc.includes(q) || ip.includes(q);
-  });
-
-  const TABS = [
-    { id: 'settings', label: 'Platform Policies', icon: Settings },
-    { id: 'admins',   label: 'Admin Directory',    icon: ShieldAlert },
-    { id: 'logs',     label: 'Audit Trail Ledger', icon: FileText },
-  ];
+  if (isLoading || !form) {
+    return <div className="card p-6 max-w-2xl space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="space-y-2"><Skeleton className="h-3 w-32" /><Skeleton className="h-10 w-full" /></div>)}</div>;
+  }
 
   return (
-    <AppShell
-      title="Root Control Panel"
-      subtitle="SuperAdmin governance, platform rate policy, and immutable security audit logs"
-    >
-      <Toast message={toastMsg} />
-
-      <div className="space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 w-fit flex-wrap">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
-                activeTab === id
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
-                  : 'text-slate-500 hover:text-slate-800'
-              )}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <div className="max-w-xl">
-            <div className="card p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Platform Policy Parameters</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Applied immediately to all fare quotes and user sessions</p>
-                </div>
-                <Sliders size={20} className="text-emerald-600" />
-              </div>
-
-              {settingsLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    updateSettingsMutation.mutate(settingsForm);
-                  }}
-                  className="space-y-5"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <Key size={14} className="text-emerald-600" /> Platform Commission Rate
-                      </label>
-                      <span className="font-mono font-black text-emerald-700 text-sm">
-                        {settingsForm.commission_rate}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="40"
-                      value={settingsForm.commission_rate}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, commission_rate: Number(e.target.value) })}
-                      className="w-full accent-emerald-600 cursor-pointer"
-                    />
-                    <p className="text-[11px] text-slate-400 mt-1">Platform fee deducted from gross passenger fares</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <AlertCircle size={14} className="text-amber-500" /> Daily Cancellation Limit
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="20"
-                      value={settingsForm.max_cancellations_per_day}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, max_cancellations_per_day: Number(e.target.value) })}
-                      className="input-field font-semibold"
-                    />
-                    <p className="text-[11px] text-slate-400 mt-1">Maximum allowed cancellations per rider before soft cooldown</p>
-                  </div>
-
-                  {/* Maintenance Switch */}
-                  <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">Platform Maintenance Mode</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">Pause ride matching during system updates</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSettingsForm({ ...settingsForm, maintenance_mode: !settingsForm.maintenance_mode })}
-                      className={clsx(
-                        'relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer',
-                        settingsForm.maintenance_mode ? 'bg-rose-600' : 'bg-slate-300'
-                      )}
-                    >
-                      <span
-                        className={clsx(
-                          'absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform',
-                          settingsForm.maintenance_mode && 'translate-x-5'
-                        )}
-                      />
-                    </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={updateSettingsMutation.isPending}
-                    className="btn-primary w-full py-3 text-sm font-bold shadow-lg shadow-emerald-500/25"
-                  >
-                    {updateSettingsMutation.isPending ? <Spinner size={16} className="text-white" /> : <CheckCircle2 size={16} />}
-                    {updateSettingsMutation.isPending ? 'Propagating...' : 'Save & Publish Policy Changes'}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Admins Tab */}
-        {activeTab === 'admins' && (
-          <div className="card overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200/80 bg-slate-50/50">
-              <h3 className="text-sm font-bold text-slate-900">Authorized System Administrators</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Personnel with elevated permissions across the fleet</p>
-            </div>
-
-            {adminsLoading ? (
-              <div className="p-8 text-center text-slate-400">
-                <Spinner size={24} className="text-emerald-600 mx-auto mb-2" />
-                <span className="text-xs font-bold">Loading administrators...</span>
-              </div>
-            ) : admins.length === 0 ? (
-              <EmptyState icon={ShieldAlert} title="No Admin Accounts" description="No elevated operator accounts found." />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Administrator</th>
-                      <th>Email Handle</th>
-                      <th>System Role</th>
-                      <th>Account Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {admins.map((adm) => (
-                      <tr key={adm.user_id} className="hover:bg-slate-50 transition-colors">
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-sm">
-                              {adm.name?.[0]?.toUpperCase() || 'A'}
-                            </div>
-                            <span className="font-bold text-xs text-slate-900">{adm.name}</span>
-                          </div>
-                        </td>
-                        <td><span className="font-mono text-xs text-slate-600">{adm.email}</span></td>
-                        <td><span className="badge bg-blue-50 text-blue-700 capitalize text-[10px] font-bold">{adm.role}</span></td>
-                        <td><StatusBadge status={adm.status || 'active'} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Logs Tab */}
-        {activeTab === 'logs' && (
-          <div className="card overflow-hidden space-y-0">
-            <div className="p-4 sm:px-6 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Immutable Audit Trail</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Tamper-evident logs of logins, rate adjustments, and ride statuses</p>
-              </div>
-
-              <div className="relative w-full sm:w-64">
-                <Search size={15} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={logSearch}
-                  onChange={(e) => setLogSearch(e.target.value)}
-                  placeholder="Filter logs by action..."
-                  className="input-field pl-9 text-xs py-2"
-                />
-              </div>
-            </div>
-
-            {logsLoading ? (
-              <div className="p-8 text-center text-slate-400">
-                <Spinner size={24} className="text-emerald-600 mx-auto mb-2" />
-                <span className="text-xs font-bold">Streaming audit records...</span>
-              </div>
-            ) : filteredLogs.length === 0 ? (
-              <EmptyState icon={FileText} title="No audit entries found" description="Audit log stream is currently clear." />
-            ) : (
-              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
-                <table className="data-table">
-                  <thead className="sticky top-0 bg-slate-50 z-10">
-                    <tr>
-                      <th>Event Action</th>
-                      <th>Activity Description</th>
-                      <th>Client IP</th>
-                      <th>Recorded At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLogs.map((log) => (
-                      <tr key={log.log_id} className="hover:bg-slate-50 transition-colors">
-                        <td>
-                          <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="text-xs text-slate-800 max-w-sm font-medium">{log.description}</td>
-                        <td><span className="font-mono text-xs text-slate-500">{log.ip_address || '127.0.0.1'}</span></td>
-                        <td className="text-[11px] text-slate-400 whitespace-nowrap">
-                          {log.created_at ? new Date(log.created_at).toLocaleString() : 'Recent'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+    <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="card p-6 sm:p-8 max-w-2xl space-y-6">
+      <div>
+        <h3 className="text-base font-semibold text-slate-900">Platform settings</h3>
+        <p className="text-xs text-slate-500 mt-0.5">Applied immediately across the platform.</p>
       </div>
-    </AppShell>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {SETTINGS_FIELDS.map(({ key, label, type, min, max, step, hint }) => (
+          <div key={key}>
+            <label className="label" htmlFor={`set-${key}`}>{label}</label>
+            <input id={`set-${key}`} type={type} min={min} max={max} step={step} value={form[key] ?? ''} required
+              onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="input-field" />
+            {hint && <p className="text-[11px] text-slate-400 mt-1">{hint}</p>}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">Maintenance mode</div>
+          <div className="text-xs text-slate-500 mt-0.5">Flag the platform as under maintenance.</div>
+        </div>
+        <button type="button" role="switch" aria-checked={!!form.maintenance_mode}
+          onClick={() => setForm({ ...form, maintenance_mode: !form.maintenance_mode })}
+          className={clsx('relative w-11 h-6 rounded-full transition-colors flex-shrink-0', form.maintenance_mode ? 'bg-rose-600' : 'bg-slate-300')}>
+          <span className={clsx('absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform', form.maintenance_mode && 'translate-x-5')} />
+        </button>
+      </div>
+
+      <div className="flex justify-end pt-2 border-t border-slate-100">
+        <button type="submit" disabled={saveMutation.isPending} className="btn-primary">
+          {saveMutation.isPending ? <Spinner size={15} /> : <Save size={15} />} Save settings
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ─── Admins ───────────────────────────────────────────────────── */
+const EMPTY_ADMIN = { name: '', email: '', mobile: '', password: '', permissions: [] };
+
+function AdminsPanel({ showToast, queryClient }) {
+  const me = useAuthStore((s) => s.user);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_ADMIN);
+  const [formError, setFormError] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['superadminAdmins'],
+    queryFn: () => api.get('/superadmin/admins').then((r) => r.data),
+  });
+  const admins = data?.admins || [];
+  const availablePermissions = data?.available_permissions || [];
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['superadminAdmins'] });
+    queryClient.invalidateQueries({ queryKey: ['superadminOverview'] });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: () => api.post('/superadmin/admins', form),
+    onSuccess: () => { showToast('Admin account created.'); setOpen(false); setForm(EMPTY_ADMIN); refresh(); },
+    onError: (err) => setFormError(errorMessage(err, 'Could not create admin.')),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, action }) => api.put(`/superadmin/admins/${id}/${action}`),
+    onSuccess: (res) => { showToast(res.data?.message || 'Updated.'); refresh(); },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  });
+
+  const togglePerm = (p) => setForm((f) => ({ ...f, permissions: f.permissions.includes(p) ? f.permissions.filter((x) => x !== p) : [...f.permissions, p] }));
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="card-header">
+        <div><div className="card-title">Administrator accounts</div><div className="card-subtitle">Operations admins and their permissions</div></div>
+        <button onClick={() => { setForm(EMPTY_ADMIN); setFormError(''); setOpen(true); }} className="btn-primary btn-sm"><Plus size={14} /> New admin</button>
+      </div>
+      {isLoading ? <SkeletonRows rows={3} /> : admins.length === 0 ? <EmptyState icon={ShieldCheck} title="No admin accounts" /> : (
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Administrator</th><th>Role</th><th>Permissions</th><th>Created</th><th>Status</th><th className="text-right">Actions</th></tr></thead>
+            <tbody>
+              {admins.map((a) => {
+                const isSelf = a.user_id === me?.user_id;
+                return (
+                  <tr key={a.user_id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">{initials(a.name)}</div>
+                        <div className="min-w-0"><div className="font-medium text-slate-900 truncate">{a.name}{isSelf && <span className="text-slate-400 font-normal"> (you)</span>}</div><div className="text-[11px] text-slate-400 truncate">{a.email}</div></div>
+                      </div>
+                    </td>
+                    <td><span className="badge badge-neutral">{capitalize(a.role)}</span></td>
+                    <td>
+                      {a.role === 'superadmin' ? <span className="text-xs text-slate-500">All permissions</span> : a.permissions.length === 0 ? <span className="text-xs text-slate-400">None</span> : (
+                        <div className="flex flex-wrap gap-1 max-w-xs">{a.permissions.map((p) => <span key={p} className="badge badge-neutral text-[10px]">{p.replace(/_/g, ' ')}</span>)}</div>
+                      )}
+                    </td>
+                    <td className="text-slate-600 whitespace-nowrap">{formatDate(a.created_at, { withTime: false })}</td>
+                    <td><StatusBadge status={a.status} /></td>
+                    <td>
+                      <div className="flex justify-end">
+                        {!isSelf && a.role !== 'superadmin' && (
+                          a.status === 'active' ? (
+                            <button onClick={() => statusMutation.mutate({ id: a.user_id, action: 'deactivate' })} disabled={statusMutation.isPending} className="btn-danger-soft btn-sm"><UserX size={13} /> Deactivate</button>
+                          ) : (
+                            <button onClick={() => statusMutation.mutate({ id: a.user_id, action: 'activate' })} disabled={statusMutation.isPending} className="btn-secondary btn-sm"><UserCheck size={13} /> Activate</button>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Create admin account"
+        description="The new admin can sign in immediately with this password."
+        footer={
+          <>
+            <button type="button" onClick={() => setOpen(false)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending || !form.name || !form.email || !form.mobile || form.password.length < 6} className="btn-primary">
+              {createMutation.isPending ? <Spinner size={14} /> : <Plus size={14} />} Create
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {formError && <Alert type="error">{formError}</Alert>}
+          <div><label className="label" htmlFor="adm-name">Full name</label><input id="adm-name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label" htmlFor="adm-email">Email</label><input id="adm-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" /></div>
+            <div><label className="label" htmlFor="adm-mobile">Mobile</label><input id="adm-mobile" type="tel" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="9876543210" className="input-field" /></div>
+          </div>
+          <div><label className="label" htmlFor="adm-password">Temporary password</label><input id="adm-password" type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 6 characters" className="input-field" /></div>
+          <div>
+            <span className="label">Permissions</span>
+            <div className="flex flex-wrap gap-2">
+              {availablePermissions.map((p) => (
+                <button key={p} type="button" onClick={() => togglePerm(p)}
+                  className={clsx('badge cursor-pointer', form.permissions.includes(p) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'badge-neutral')}>
+                  {p.replace(/_/g, ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/* ─── Audit log ────────────────────────────────────────────────── */
+function LogsPanel() {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['superadminLogs', search, page],
+    queryFn: () => api.get('/superadmin/logs', { params: { action: search || undefined, page, limit: 50 } }).then((r) => r.data),
+    placeholderData: (prev) => prev,
+  });
+  const logs = data?.logs || [];
+  const pagination = data?.pagination || { page: 1, total_pages: 1, total: 0 };
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="card-header flex-col sm:flex-row items-stretch sm:items-center">
+        <div><div className="card-title">Audit log</div><div className="card-subtitle">{pagination.total} events recorded</div></div>
+        <div className="relative w-full sm:w-72">
+          <Search size={15} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Filter by action or description" className="input-field pl-9 py-2 text-[13px]" />
+        </div>
+      </div>
+
+      {isLoading ? <SkeletonRows rows={6} /> : logs.length === 0 ? <EmptyState icon={FileText} title="No matching events" /> : (
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Action</th><th>Description</th><th>User</th><th>IP</th><th>Time</th></tr></thead>
+            <tbody>
+              {logs.map((l) => (
+                <tr key={l.log_id}>
+                  <td><span className="font-mono text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 whitespace-nowrap">{l.action}</span></td>
+                  <td className="text-slate-800 max-w-md">{l.description}</td>
+                  <td className="whitespace-nowrap"><div className="text-slate-800">{l.user_name}</div><div className="text-[11px] text-slate-400">{capitalize(l.user_role)}</div></td>
+                  <td className="font-mono text-xs text-slate-500 whitespace-nowrap">{l.ip_address || '—'}</td>
+                  <td className="text-slate-500 whitespace-nowrap">{formatDate(l.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {pagination.total_pages > 1 && (
+        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>Page {pagination.page} of {pagination.total_pages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="btn-secondary btn-sm">Previous</button>
+            <button onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.total_pages} className="btn-secondary btn-sm">Next</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

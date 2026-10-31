@@ -1,222 +1,176 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../services/api';
-import { Car, Clock, DollarSign, CheckCircle2, Search, ArrowUpRight, Calendar } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, errorMessage } from '../../services/api';
+import { Car, Wallet, CheckCircle2, XCircle, Search, Star, Plus } from 'lucide-react';
 import AppShell from '../../components/ui/AppShell';
-import { KPICard, StatusBadge, EmptyState, Skeleton } from '../../components/ui/UIKit';
+import { KPICard, StatusBadge, EmptyState, SkeletonKPIs, SkeletonRows, Modal, Toast, useToast, Spinner, Alert } from '../../components/ui/UIKit';
+import { formatCurrency, formatDate, capitalize } from '../../utils/format';
+import clsx from 'clsx';
+
+const EMPTY_HISTORY = [];
+
+const STATUS_FILTERS = [
+  { id: '',          label: 'All' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'cancelled', label: 'Cancelled' },
+  { id: 'pending',   label: 'Pending' },
+  { id: 'accepted',  label: 'Accepted' },
+];
 
 export default function PassengerHistory() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const queryClient = useQueryClient();
+  const [toast, showToast] = useToast();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [rateTarget, setRateTarget] = useState(null); // trip row being rated
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [rateError, setRateError] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['passengerTrips'],
-    queryFn: () => api.get('/passenger/trips').then((r) => r.data),
+    queryKey: ['rideHistory'],
+    queryFn: () => api.get('/rides/history').then((r) => r.data),
+  });
+  const history = data?.history ?? EMPTY_HISTORY;
+
+  const summary = useMemo(() => {
+    const completed = history.filter((h) => h.request_status === 'completed');
+    return {
+      total: history.length,
+      completed: completed.length,
+      cancelled: history.filter((h) => h.request_status === 'cancelled').length,
+      spent: completed.reduce((acc, h) => acc + Number(h.final_fare ?? h.estimated_fare ?? 0), 0),
+    };
+  }, [history]);
+
+  const rows = history.filter((h) => {
+    if (statusFilter && h.request_status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [h.pickup_location, h.destination, h.driver_name, h.vehicle_number, String(h.request_id)]
+      .some((v) => (v || '').toString().toLowerCase().includes(q));
   });
 
-  const trips = data?.trips || data?.data || [];
-
-  const totalSpent = trips.reduce(
-    (acc, t) =>
-      acc + (t.status === 'completed' || t.trip_status === 'completed'
-        ? Number(t.fare || t.estimated_fare || 0)
-        : 0),
-    0
-  );
-
-  const completedCount = trips.filter((t) => (t.status || t.trip_status) === 'completed').length;
-  const cancelledCount = trips.filter((t) => (t.status || t.trip_status) === 'cancelled').length;
-
-  const filteredTrips = trips.filter((t) => {
-    const q = searchTerm.toLowerCase();
-    const pickup = (t.pickup_location || '').toLowerCase();
-    const dest = (t.destination || '').toLowerCase();
-    const rid = String(t.request_id || t.trip_id || '');
-    return pickup.includes(q) || dest.includes(q) || rid.includes(q);
+  const rateMutation = useMutation({
+    mutationFn: () => api.post('/ratings', { trip_id: rateTarget.trip_id, rating: Number(rating), comment: comment.trim() || undefined }),
+    onSuccess: () => {
+      showToast('Rating submitted. Thank you!');
+      setRateTarget(null); setComment(''); setRating(5);
+      queryClient.invalidateQueries({ queryKey: ['rideHistory'] });
+    },
+    onError: (err) => setRateError(errorMessage(err, 'Could not submit rating.')),
   });
+
+  const openRate = (row) => { setRateTarget(row); setRating(5); setComment(''); setRateError(''); };
 
   return (
     <AppShell
-      title="Ride History & Invoices"
-      subtitle="Complete chronological record of all transit journeys taken"
-      action={
-        <Link to="/passenger/book-ride" className="btn-primary text-sm shadow-md shadow-emerald-500/20">
-          + Book Ride
-        </Link>
-      }
+      title="Trip history"
+      subtitle="All your bookings, receipts and ratings"
+      action={<Link to="/passenger/book-ride" className="btn-primary"><Plus size={16} /> Book a ride</Link>}
     >
+      <Toast toast={toast} />
       <div className="space-y-6">
-        {/* Summary KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="card p-5 space-y-3">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-8 w-16" />
-              </div>
-            ))
-          ) : (
+          {isLoading ? <SkeletonKPIs /> : (
             <>
-              <KPICard
-                label="Total Trips"
-                value={trips.length}
-                icon={Car}
-                gradient="linear-gradient(135deg,#3B82F6,#1D4ED8)"
-              />
-              <KPICard
-                label="Completed"
-                value={completedCount}
-                icon={CheckCircle2}
-                gradient="linear-gradient(135deg,#10B981,#047857)"
-              />
-              <KPICard
-                label="Cancelled"
-                value={cancelledCount}
-                icon={Car}
-                gradient="linear-gradient(135deg,#EF4444,#B91C1C)"
-              />
-              <KPICard
-                label="Total Spent"
-                value={`₹${totalSpent.toFixed(0)}`}
-                icon={DollarSign}
-                gradient="linear-gradient(135deg,#16A34A,#15803D)"
-                accentBg
-              />
+              <KPICard label="Total bookings" value={summary.total} icon={Car} tone="blue" />
+              <KPICard label="Completed" value={summary.completed} icon={CheckCircle2} tone="brand" />
+              <KPICard label="Cancelled" value={summary.cancelled} icon={XCircle} tone="rose" />
+              <KPICard label="Total spent" value={formatCurrency(summary.spent)} icon={Wallet} tone="amber" />
             </>
           )}
         </div>
 
-        {/* Search & Filter Bar */}
-        <div className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search size={16} className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by route, address or ID..."
-              className="input-field pl-10 text-xs py-2.5"
-            />
-          </div>
-          <div className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-            <span>Showing {filteredTrips.length} records</span>
-          </div>
-        </div>
-
-        {/* Trip List Table */}
         <div className="card overflow-hidden">
-          {isLoading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="w-10 h-10 rounded-xl" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-56" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                  <Skeleton className="h-6 w-20 rounded-full" />
-                </div>
+          <div className="card-header flex-col sm:flex-row items-stretch sm:items-center">
+            <div className="relative flex-1 max-w-sm">
+              <Search size={15} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search route, driver or booking #" className="input-field pl-9 py-2 text-[13px]" />
+            </div>
+            <div className="tabs">
+              {STATUS_FILTERS.map((f) => (
+                <button key={f.id} type="button" onClick={() => setStatusFilter(f.id)} className={clsx('tab', statusFilter === f.id && 'active')}>{f.label}</button>
               ))}
             </div>
-          ) : filteredTrips.length === 0 ? (
-            <EmptyState
-              icon={Car}
-              title="No rides found"
-              description="No rides matched your search query or no journeys have been recorded yet."
-              action={
-                <Link to="/passenger/book-ride" className="btn-primary text-xs">
-                  Book a Ride Now
-                </Link>
-              }
-            />
-          ) : (
-            <>
-              {/* Desktop View */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Booking Ref</th>
-                      <th>Trip Route</th>
-                      <th>Timestamp</th>
-                      <th>Category</th>
-                      <th>Fare</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTrips.map((ride) => {
-                      const rid = ride.request_id || ride.trip_id;
-                      const status = ride.status || ride.trip_status;
-                      return (
-                        <tr key={rid} className="hover:bg-slate-50/80 transition-colors">
-                          <td>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-slate-600">#{rid}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="text-xs font-bold text-slate-900 max-w-xs truncate">
-                              {ride.pickup_location} → {ride.destination}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                              <Clock size={12} className="text-slate-400" />
-                              <span>{ride.requested_at || ride.start_time || 'Recent'}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="badge bg-slate-100 text-slate-700 capitalize font-medium">
-                              {ride.vehicle_type || 'Sedan'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="text-xs font-black text-slate-900">
-                              ₹{ride.fare || ride.estimated_fare || '—'}
-                            </span>
-                          </td>
-                          <td>
-                            <StatusBadge status={status} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          </div>
 
-              {/* Mobile View */}
-              <div className="sm:hidden divide-y divide-slate-100">
-                {filteredTrips.map((ride) => {
-                  const rid = ride.request_id || ride.trip_id;
-                  const status = ride.status || ride.trip_status;
-                  return (
-                    <div key={rid} className="p-4 flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {ride.pickup_location} → {ride.destination}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
-                          <span>#{rid}</span>
-                          <span>•</span>
-                          <span className="capitalize">{ride.vehicle_type || 'Sedan'}</span>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-xs font-black text-slate-900 mb-1">
-                          ₹{ride.fare || ride.estimated_fare || '—'}
-                        </div>
-                        <StatusBadge status={status} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+          {isLoading ? <SkeletonRows rows={5} /> : rows.length === 0 ? (
+            <EmptyState icon={Car} title="No trips found" description={history.length ? 'Try a different search or filter.' : 'Book your first ride to see it here.'} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Booking</th><th>Route</th><th>Driver</th><th>Vehicle</th><th>Fare</th><th>Payment</th><th>Status</th><th>Rating</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((h) => {
+                    const fare = h.final_fare ?? h.estimated_fare;
+                    const canRate = h.trip_status === 'completed' && h.trip_id && h.rating == null;
+                    return (
+                      <tr key={h.request_id}>
+                        <td className="whitespace-nowrap">
+                          <div className="font-mono text-xs font-semibold text-slate-700">#{h.request_id}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">{formatDate(h.requested_at)}</div>
+                        </td>
+                        <td><div className="font-medium text-slate-900 max-w-[240px] truncate">{h.pickup_location} → {h.destination}</div></td>
+                        <td className="text-slate-700 whitespace-nowrap">{h.driver_name || <span className="text-slate-400">—</span>}</td>
+                        <td>
+                          <span className="badge badge-neutral">{capitalize(h.vehicle_type)}</span>
+                          {h.vehicle_number && <div className="font-mono text-[11px] text-slate-400 mt-1">{h.vehicle_number}</div>}
+                        </td>
+                        <td className="font-semibold text-slate-900 whitespace-nowrap">{formatCurrency(fare)}</td>
+                        <td className="whitespace-nowrap">
+                          {h.payment_status ? (
+                            <div className="text-xs"><StatusBadge status={h.payment_status} /><div className="text-slate-400 mt-1 capitalize">{h.payment_method}</div></div>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td><StatusBadge status={h.request_status} /></td>
+                        <td className="whitespace-nowrap">
+                          {h.rating != null ? (
+                            <span className="flex items-center gap-1 text-xs font-semibold text-amber-600"><Star size={13} className="fill-amber-400 text-amber-400" /> {h.rating}/5</span>
+                          ) : canRate ? (
+                            <button onClick={() => openRate(h)} className="btn-secondary btn-sm"><Star size={13} /> Rate</button>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
+
+      <Modal
+        open={!!rateTarget}
+        onClose={() => setRateTarget(null)}
+        title="Rate your trip"
+        description={rateTarget ? `${rateTarget.pickup_location} → ${rateTarget.destination} · ${rateTarget.driver_name || 'Driver'}` : ''}
+        footer={
+          <>
+            <button type="button" onClick={() => setRateTarget(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={() => rateMutation.mutate()} disabled={rateMutation.isPending} className="btn-primary">
+              {rateMutation.isPending ? <Spinner size={14} /> : <Star size={14} />} Submit
+            </button>
+          </>
+        }
+      >
+        {rateError && <Alert type="error" className="mb-4">{rateError}</Alert>}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button key={star} type="button" onClick={() => setRating(star)} aria-label={`${star} stars`} className="p-1 hover:scale-110 transition-transform">
+              <Star size={28} className={clsx(star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300')} />
+            </button>
+          ))}
+        </div>
+        <input type="text" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={1000} placeholder="Add a comment (optional)" className="input-field" />
+      </Modal>
     </AppShell>
   );
 }

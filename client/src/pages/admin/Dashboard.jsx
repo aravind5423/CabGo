@@ -1,215 +1,323 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
-import { Users, Car, DollarSign, Activity, CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, Sliders, ArrowUpRight } from 'lucide-react';
+import { api, errorMessage } from '../../services/api';
+import { Users, Car, Wallet, Activity, CheckCircle2, XCircle, ShieldOff, ShieldCheck, Pencil, Search, LayoutDashboard, Sliders } from 'lucide-react';
 import AppShell from '../../components/ui/AppShell';
-import { KPICard, StatusBadge, EmptyState, Skeleton, Toast, Spinner } from '../../components/ui/UIKit';
+import { KPICard, StatusBadge, EmptyState, SkeletonKPIs, SkeletonRows, Toast, useToast, Spinner, Tabs, Modal, Alert, IconChip } from '../../components/ui/UIKit';
+import { formatCurrency, formatDate, capitalize, timeAgo, initials } from '../../utils/format';
 import clsx from 'clsx';
 
+const TABS = [
+  { id: 'overview', label: 'Overview',   icon: LayoutDashboard },
+  { id: 'drivers',  label: 'Drivers',    icon: Car },
+  { id: 'fares',    label: 'Fare rules', icon: Sliders },
+];
+
+const DRIVER_FILTERS = [
+  { id: '',         label: 'All' },
+  { id: 'pending',  label: 'Pending' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'blocked',  label: 'Blocked' },
+];
+
 export default function AdminDashboard() {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [toastMsg, setToastMsg] = useState('');
-  const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
+  const [toast, showToast] = useToast();
+  const [tab, setTab] = useState('overview');
 
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['adminStats'],
     queryFn: () => api.get('/admin/stats').then((r) => r.data),
     refetchInterval: 15000,
   });
-
-  const { data: fareData, isLoading: fareLoading } = useQuery({
-    queryKey: ['fareRules'],
-    queryFn: () => api.get('/admin/fare-rules').then((r) => r.data),
-    enabled: activeTab === 'fares',
-  });
-
-  const verifyDriverMutation = useMutation({
-    mutationFn: ({ id, status }) => api.put(`/admin/drivers/${id}/status`, { status }),
-    onSuccess: () => {
-      showToast('Driver verification status updated.');
-      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to update driver status'),
-  });
-
-  const stats = statsData?.stats || statsData || {};
-  const rules = fareData?.rules || [];
-
-  const TABS = [
-    { id: 'overview', label: 'Platform Operations Overview' },
-    { id: 'fares',    label: 'Dynamic Fare Matrix' },
-  ];
+  const stats = statsData?.stats || {};
+  const recentTrips = statsData?.recent_trips || [];
+  const recentLogs  = statsData?.recent_logs || [];
 
   return (
-    <AppShell
-      title="Operations Command Center"
-      subtitle="Fleet surveillance, platform health KPIs, and dynamic fare configuration"
-    >
-      <Toast message={toastMsg} />
-
+    <AppShell title="Operations" subtitle="Platform health, driver verification and fare configuration">
+      <Toast toast={toast} />
       <div className="space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 w-fit">
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={clsx(
-                'px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
-                activeTab === id
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
-                  : 'text-slate-500 hover:text-slate-800'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs tabs={TABS.map((t) => (t.id === 'drivers' && stats.drivers?.pending ? { ...t, count: stats.drivers.pending } : t))} value={tab} onChange={setTab} />
 
-        {activeTab === 'overview' && (
+        {tab === 'overview' && (
           <div className="space-y-6">
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {statsLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="card p-5 space-y-3">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-8 w-20" />
-                  </div>
-                ))
-              ) : (
+              {statsLoading ? <SkeletonKPIs /> : (
                 <>
-                  <KPICard
-                    label="Total Platform Trips"
-                    value={stats.trips?.total ?? stats.total_trips ?? 0}
-                    icon={Activity}
-                    gradient="linear-gradient(135deg,#3B82F6,#1D4ED8)"
-                    trend={15}
-                    trendLabel="trips completed"
-                  />
-                  <KPICard
-                    label="Online Drivers"
-                    value={stats.drivers?.online ?? stats.online_drivers ?? 0}
-                    icon={Car}
-                    gradient="linear-gradient(135deg,#10B981,#047857)"
-                    trend={100}
-                    trendLabel="ready to dispatch"
-                  />
-                  <KPICard
-                    label="Registered Passengers"
-                    value={stats.passengers?.total ?? stats.total_passengers ?? 0}
-                    icon={Users}
-                    gradient="linear-gradient(135deg,#F59E0B,#D97706)"
-                  />
-                  <KPICard
-                    label="Gross Fare Volume"
-                    value={`₹${stats.revenue?.total_fare_volume ?? '0'}`}
-                    icon={DollarSign}
-                    gradient="linear-gradient(135deg,#16A34A,#15803D)"
-                    accentBg
-                  />
+                  <KPICard label="Total trips" value={stats.trips?.total ?? 0} icon={Activity} tone="blue" hint={`${stats.trips?.completed ?? 0} completed · ${stats.trips?.active ?? 0} in progress`} />
+                  <KPICard label="Drivers online" value={`${stats.drivers?.online ?? 0} / ${stats.drivers?.total ?? 0}`} icon={Car} tone="brand" hint={`${stats.drivers?.pending ?? 0} pending verification`} />
+                  <KPICard label="Passengers" value={stats.passengers?.total ?? 0} icon={Users} tone="amber" hint={`${stats.passengers?.new_7d ?? 0} new this week`} />
+                  <KPICard label="Revenue" value={formatCurrency(stats.trips?.revenue ?? 0, { decimals: 0 })} icon={Wallet} tone="violet" hint="Completed trip fares" />
                 </>
               )}
             </div>
 
-            {/* Pending Approvals Callout */}
-            {stats.drivers?.pending_approval > 0 && (
-              <div className="card p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-white border-amber-500/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-black">
-                      !
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">
-                        {stats.drivers.pending_approval} Driver Applicant(s) Awaiting Verification
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Commercial licenses and documents have been submitted and require ops sign-off.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="badge bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1">
-                    Needs Action
-                  </span>
+            {stats.drivers?.pending > 0 && (
+              <Alert type="warning">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <span><strong>{stats.drivers.pending}</strong> driver application{stats.drivers.pending === 1 ? '' : 's'} awaiting verification.</span>
+                  <button onClick={() => setTab('drivers')} className="btn-secondary btn-sm">Review drivers</button>
                 </div>
-              </div>
+              </Alert>
             )}
 
-            {/* Platform Infrastructure HUD */}
-            <div className="card p-6 bg-gradient-to-br from-white to-slate-50">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
-                  <ShieldCheck size={24} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Enterprise Operations Active</h4>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
-                    TiDB Cloud database replication is active, live driver telemetry heartbeat is synced with the Leaflet CartoDB CDN tiles, and dynamic fare rules are enforcing automated trip quotes without latency.
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 card overflow-hidden">
+                <div className="card-header"><div className="card-title">Recent trips</div></div>
+                {statsLoading ? <SkeletonRows rows={4} /> : recentTrips.length === 0 ? (
+                  <EmptyState icon={Activity} title="No trips yet" compact />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead><tr><th>Trip</th><th>Route</th><th>Passenger</th><th>Driver</th><th>Fare</th><th>Status</th></tr></thead>
+                      <tbody>
+                        {recentTrips.map((t) => (
+                          <tr key={t.trip_id}>
+                            <td><span className="font-mono text-xs font-semibold text-slate-700">#{t.trip_id}</span><div className="text-[11px] text-slate-400 mt-0.5">{formatDate(t.requested_at)}</div></td>
+                            <td><div className="font-medium text-slate-900 max-w-[220px] truncate">{t.pickup} → {t.destination}</div><div className="text-[11px] text-slate-400 mt-0.5">{capitalize(t.vehicle_type)} · {t.vehicle_number}</div></td>
+                            <td className="whitespace-nowrap">{t.passenger_name}</td>
+                            <td className="whitespace-nowrap">{t.driver_name}</td>
+                            <td className="font-semibold whitespace-nowrap">{formatCurrency(t.fare)}</td>
+                            <td><StatusBadge status={t.status} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="card overflow-hidden">
+                <div className="card-header"><div className="card-title">Recent activity</div></div>
+                {statsLoading ? <SkeletonRows rows={5} /> : recentLogs.length === 0 ? (
+                  <EmptyState icon={Activity} title="No activity" compact />
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {recentLogs.map((l) => (
+                      <li key={l.log_id} className="px-5 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[11px] font-semibold text-emerald-700">{l.action}</span>
+                          <span className="text-[11px] text-slate-400 whitespace-nowrap">{timeAgo(l.created_at)}</span>
+                        </div>
+                        <div className="text-xs text-slate-700 mt-0.5 line-clamp-2">{l.description}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{l.user}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'fares' && (
-          <div className="card overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Vehicle Category Fare Matrix</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Base rates and per-kilometer tariffs calculated during passenger search</p>
-              </div>
-            </div>
+        {tab === 'drivers' && <DriversPanel showToast={showToast} queryClient={queryClient} />}
+        {tab === 'fares'   && <FaresPanel showToast={showToast} queryClient={queryClient} />}
+      </div>
+    </AppShell>
+  );
+}
 
-            {fareLoading ? (
-              <div className="p-8 text-center text-slate-400">
-                <Spinner size={24} className="text-emerald-600 mx-auto mb-2" />
-                <span className="text-xs font-bold">Loading fare rules matrix...</span>
-              </div>
-            ) : rules.length === 0 ? (
-              <EmptyState
-                icon={Car}
-                title="No fare rules active"
-                description="Configure vehicle base tariffs to enable dynamic routing."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Fleet Class</th>
-                      <th>Base Fare</th>
-                      <th>Per-KM Rate</th>
-                      <th>Per-Minute Rate</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rules.map((r) => (
-                      <tr key={r.fare_id} className="hover:bg-slate-50 transition-colors">
-                        <td>
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-xl">🚘</span>
-                            <span className="font-bold capitalize text-slate-900 text-xs">{r.vehicle_type}</span>
-                          </div>
-                        </td>
-                        <td><span className="font-mono text-xs font-bold text-slate-700">₹{r.base_fare}</span></td>
-                        <td><span className="font-mono text-xs font-bold text-emerald-700">₹{r.per_km_rate} / km</span></td>
-                        <td><span className="font-mono text-xs text-slate-600">₹{r.per_minute_rate || '1.5'} / min</span></td>
-                        <td><StatusBadge status={r.status || 'active'} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+/* ─── Drivers ───────────────────────────────────────────────────── */
+function DriversPanel({ showToast, queryClient }) {
+  const [filter, setFilter] = useState('');
+  const [search, setSearch] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['adminDrivers', filter, search],
+    queryFn: () => api.get('/admin/drivers', { params: { verification: filter || undefined, search: search || undefined } }).then((r) => r.data),
+  });
+  const drivers = data?.drivers || [];
+  const summary = data?.summary || {};
+
+  const actionMutation = useMutation({
+    mutationFn: ({ id, action }) => api.put(`/admin/drivers/${id}/${action}`),
+    onSuccess: (res) => {
+      showToast(res.data?.message || 'Driver updated.');
+      queryClient.invalidateQueries({ queryKey: ['adminDrivers'] });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  });
+
+  const busy = (id) => actionMutation.isPending && actionMutation.variables?.id === id;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard label="Total drivers" value={summary.total ?? 0} icon={Car} tone="blue" />
+        <KPICard label="Pending" value={summary.pending ?? 0} icon={ShieldCheck} tone="amber" />
+        <KPICard label="Online now" value={summary.online ?? 0} icon={Activity} tone="brand" />
+        <KPICard label="Blocked" value={summary.blocked ?? 0} icon={ShieldOff} tone="rose" />
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="card-header flex-col sm:flex-row items-stretch sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={15} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, licence" className="input-field pl-9 py-2 text-[13px]" />
+          </div>
+          <Tabs tabs={DRIVER_FILTERS} value={filter} onChange={setFilter} />
+        </div>
+
+        {isLoading ? <SkeletonRows rows={5} /> : drivers.length === 0 ? (
+          <EmptyState icon={Car} title="No drivers match" description="Try another filter or search term." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead><tr><th>Driver</th><th>Licence</th><th>Vehicle</th><th>Trips</th><th>Rating</th><th>Verification</th><th>Account</th><th className="text-right">Actions</th></tr></thead>
+              <tbody>
+                {drivers.map((d) => (
+                  <tr key={d.driver_id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">{initials(d.name)}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-900 truncate">{d.name}</div>
+                          <div className="text-[11px] text-slate-400 truncate">{d.email} · {d.mobile}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap"><div className="font-mono text-xs text-slate-700">{d.license_no}</div><div className="text-[11px] text-slate-400">exp. {formatDate(d.license_expiry, { withTime: false })}</div></td>
+                    <td className="whitespace-nowrap">{d.vehicle ? <><div className="font-mono text-xs text-slate-700">{d.vehicle.vehicle_number}</div><div className="text-[11px] text-slate-400">{capitalize(d.vehicle.vehicle_type)}</div></> : <span className="text-slate-400">—</span>}</td>
+                    <td className="whitespace-nowrap"><div className="font-semibold">{d.completed_trips}</div><div className="text-[11px] text-slate-400">{formatCurrency(d.total_earnings, { decimals: 0 })}</div></td>
+                    <td>{Number(d.rating || 0).toFixed(2)}</td>
+                    <td><StatusBadge status={d.verification_status} /></td>
+                    <td><StatusBadge status={d.account_status} /></td>
+                    <td>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {d.verification_status !== 'approved' && (
+                          <button onClick={() => actionMutation.mutate({ id: d.driver_id, action: 'approve' })} disabled={busy(d.driver_id)} className="btn-primary btn-sm">
+                            {busy(d.driver_id) ? <Spinner size={12} /> : <CheckCircle2 size={13} />} Approve
+                          </button>
+                        )}
+                        {d.verification_status === 'pending' && (
+                          <button onClick={() => actionMutation.mutate({ id: d.driver_id, action: 'reject' })} disabled={busy(d.driver_id)} className="btn-secondary btn-sm">
+                            <XCircle size={13} /> Reject
+                          </button>
+                        )}
+                        {d.account_status === 'blocked' ? (
+                          <button onClick={() => actionMutation.mutate({ id: d.driver_id, action: 'unblock' })} disabled={busy(d.driver_id)} className="btn-secondary btn-sm"><ShieldCheck size={13} /> Unblock</button>
+                        ) : (
+                          <button onClick={() => window.confirm(`Block ${d.name}? They will not be able to sign in.`) && actionMutation.mutate({ id: d.driver_id, action: 'block' })}
+                            disabled={busy(d.driver_id)} className="btn-danger-soft btn-sm"><ShieldOff size={13} /> Block</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
-    </AppShell>
+    </div>
+  );
+}
+
+/* ─── Fare rules ────────────────────────────────────────────────── */
+function FaresPanel({ showToast, queryClient }) {
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({});
+  const [formError, setFormError] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['fareRules'],
+    queryFn: () => api.get('/admin/fare-rules').then((r) => r.data),
+  });
+  const rules = data?.rules || [];
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.put(`/admin/fare-rules/${editing.fare_id}`, {
+      base_fare: Number(form.base_fare),
+      per_km_rate: Number(form.per_km_rate),
+      per_minute_rate: Number(form.per_minute_rate),
+      cancellation_fee: Number(form.cancellation_fee),
+      status: form.status,
+    }),
+    onSuccess: () => { showToast('Fare rule updated.'); setEditing(null); queryClient.invalidateQueries({ queryKey: ['fareRules'] }); },
+    onError: (err) => setFormError(errorMessage(err, 'Could not save fare rule.')),
+  });
+
+  const openEdit = (r) => {
+    setEditing(r);
+    setForm({ base_fare: r.base_fare, per_km_rate: r.per_km_rate, per_minute_rate: r.per_minute_rate, cancellation_fee: r.cancellation_fee, status: r.status || 'active' });
+    setFormError('');
+  };
+
+  const NUMBER_FIELDS = [
+    { key: 'base_fare',        label: 'Base fare (₹)' },
+    { key: 'per_km_rate',      label: 'Per km (₹)' },
+    { key: 'per_minute_rate',  label: 'Per minute (₹)' },
+    { key: 'cancellation_fee', label: 'Cancellation fee (₹)' },
+  ];
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="card-header">
+        <div>
+          <div className="card-title">Fare rules by vehicle type</div>
+          <div className="card-subtitle">Used to quote fares: base fare + distance × per-km rate</div>
+        </div>
+      </div>
+      {isLoading ? <SkeletonRows rows={5} /> : rules.length === 0 ? (
+        <EmptyState icon={Sliders} title="No fare rules" description="Fare rules are seeded with the database." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Vehicle type</th><th>Base fare</th><th>Per km</th><th>Per minute</th><th>Cancellation fee</th><th>Status</th><th className="text-right">Actions</th></tr></thead>
+            <tbody>
+              {rules.map((r) => (
+                <tr key={r.fare_id}>
+                  <td><div className="flex items-center gap-2.5"><IconChip icon={Car} tone="slate" size="sm" /><span className="font-semibold text-slate-900">{capitalize(r.vehicle_type)}</span></div></td>
+                  <td className="font-mono">{formatCurrency(r.base_fare)}</td>
+                  <td className="font-mono">{formatCurrency(r.per_km_rate)}</td>
+                  <td className="font-mono">{formatCurrency(r.per_minute_rate)}</td>
+                  <td className="font-mono">{formatCurrency(r.cancellation_fee)}</td>
+                  <td><StatusBadge status={r.status || 'active'} /></td>
+                  <td><div className="flex justify-end"><button onClick={() => openEdit(r)} className="btn-secondary btn-sm"><Pencil size={13} /> Edit</button></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={`Edit ${capitalize(editing?.vehicle_type)} fare rule`}
+        description="Changes apply to new fare quotes immediately."
+        footer={
+          <>
+            <button type="button" onClick={() => setEditing(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary">
+              {saveMutation.isPending ? <Spinner size={14} /> : null} Save
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {formError && <Alert type="error">{formError}</Alert>}
+          <div className="grid grid-cols-2 gap-3">
+            {NUMBER_FIELDS.map(({ key, label }) => (
+              <div key={key}>
+                <label className="label" htmlFor={`fare-${key}`}>{label}</label>
+                <input id={`fare-${key}`} type="number" min={0} step="0.5" value={form[key] ?? ''} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="input-field" />
+              </div>
+            ))}
+          </div>
+          <div>
+            <span className="label">Status</span>
+            <div className="tabs">
+              {['active', 'inactive'].map((s) => (
+                <button key={s} type="button" onClick={() => setForm({ ...form, status: s })} className={clsx('tab', form.status === s && 'active')}>{capitalize(s)}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

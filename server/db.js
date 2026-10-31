@@ -165,7 +165,8 @@ if (tidbConnect && (process.env.DATABASE_URL || isRemote)) {
       const rows = Array.isArray(raw) ? raw : (raw?.rows || []);
       return [rows];
     } catch (err) {
-      // Automatic fallback to in-memory on remote failure
+      // Automatic fallback to in-memory on remote failure (logged so query bugs stay visible)
+      console.warn('[db] TiDB query failed, using in-memory fallback:', err.message);
       return executeInMemory(sql, params);
     }
   }
@@ -232,6 +233,7 @@ if (tidbConnect && (process.env.DATABASE_URL || isRemote)) {
     try {
       return await mysqlPool.execute(sql, params);
     } catch (err) {
+      console.warn('[db] MySQL query failed, using in-memory fallback:', err.message);
       return executeInMemory(sql, params);
     }
   }

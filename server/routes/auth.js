@@ -1,5 +1,5 @@
 // server/routes/auth.js
-// Full auth implementation: register, login, logout, /me, ride search stub
+// Authentication: register, login, logout, current user, health check
 
 'use strict';
 
@@ -16,10 +16,10 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== 'string') return false;
   const [salt, hash] = stored.split(':');
   if (!salt || !hash) return false;
   const incoming = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-  // timing-safe comparison
   try {
     return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(incoming, 'hex'));
   } catch { return false; }
@@ -28,27 +28,74 @@ function verifyPassword(password, stored) {
 // ── Input validators ─────────────────────────────────────────
 const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^[6-9]\d{9}$/;
+const TOKEN_TTL_SECONDS = 24 * 60 * 60;
+
+// ── Seeded demo accounts ─────────────────────────────────────
+// Only these accounts accept the shared demo shortcut password used by the
+// login page's one-click buttons. Every other account must use its real password.
+const DEMO_ACCOUNTS = {
+  'superadmin@cab.com': 'SuperAdmin@123',
+  'admin@cab.com':      'Admin@123',
+  'admin2@cab.com':     'Admin@123',
+  'driver1@cab.com':    'Driver@123',
+  'driver2@cab.com':    'Driver@123',
+  'driver3@cab.com':    'Driver@123',
+  'driver4@cab.com':    'Driver@123',
+  'driver5@cab.com':    'Driver@123',
+  'passenger1@cab.com': 'Pass@123',
+  'passenger2@cab.com': 'Pass@123',
+  'passenger3@cab.com': 'Pass@123',
+  'passenger4@cab.com': 'Pass@123',
+  'passenger5@cab.com': 'Pass@123',
+};
+const DEMO_SHORTCUT_PASSWORD = 'password123';
+
+// Short handles accepted on the login screen (e.g. "driver1" → driver1@cab.com)
+const HANDLE_ALIASES = {
+  superadmin: 'superadmin@cab.com',
+  admin:      'admin@cab.com',
+  admin1:     'admin@cab.com',
+  admin2:     'admin2@cab.com',
+  driver:     'driver1@cab.com',
+  passenger:  'passenger1@cab.com',
+};
+
+function resolveLoginEmail(input) {
+  const handle = String(input || '').toLowerCase().trim();
+  if (HANDLE_ALIASES[handle]) return HANDLE_ALIASES[handle];
+  if (handle.includes('@')) return handle;
+  return `${handle}@cab.com`;
+}
+
+function issueToken(user) {
+  return createToken({
+    user_id: user.user_id,
+    name:    user.name,
+    email:   user.email,
+    role:    user.role,
+    exp:     Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+  });
+}
+
+function publicUser(user) {
+  return { user_id: user.user_id, name: user.name, email: user.email, mobile: user.mobile, role: user.role };
+}
 
 module.exports = function authRoute(router) {
 
   // ── GET /api/health ──────────────────────────────────────
-  router.get('/api/health', async (req, res) => {
-    req.sendJSON(200, {
-      success:   true,
-      message:   '🚖 Cab Booking API is running',
-      timestamp: new Date().toISOString(),
-    });
+  router.get('/api/health', async (req) => {
+    req.sendJSON(200, { success: true, message: 'Rydio API is running', timestamp: new Date().toISOString() });
   });
 
   // ── POST /api/auth/register ──────────────────────────────
-  router.post('/api/auth/register', async (req, res) => {
+  router.post('/api/auth/register', async (req) => {
     const {
       name, email, password, mobile, role,
       license_no, license_expiry,
       default_address, emergency_contact,
-    } = req.body;
+    } = req.body || {};
 
-    // Required field check
     if (!name || !email || !password || !mobile || !role) {
       return req.sendJSON(400, { success: false, message: 'Name, email, password, mobile and role are required.' });
     }
@@ -65,43 +112,35 @@ module.exports = function authRoute(router) {
       return req.sendJSON(400, { success: false, message: 'Password must be at least 6 characters.' });
     }
     if (role === 'driver' && (!license_no || !license_expiry)) {
-      return req.sendJSON(400, { success: false, message: 'License number and expiry are required for drivers.' });
+      return req.sendJSON(400, { success: false, message: 'License number and expiry date are required for drivers.' });
     }
 
+    const cleanEmail = email.toLowerCase().trim();
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
 
-      // Duplicate email check
-      const [existing] = await conn.execute(
-        'SELECT user_id FROM users WHERE email = ?',
-        [email.toLowerCase().trim()]
-      );
+      const [existing] = await conn.execute('SELECT user_id FROM users WHERE email = ?', [cleanEmail]);
       if (existing.length > 0) {
         await conn.rollback();
         return req.sendJSON(409, { success: false, message: 'Email is already registered.' });
       }
 
-      // Insert user
-      const hashed = hashPassword(password);
       const [userResult] = await conn.execute(
         `INSERT INTO users (name, email, password, mobile, role, status, created_at)
          VALUES (?, ?, ?, ?, ?, 'active', NOW())`,
-        [name.trim(), email.toLowerCase().trim(), hashed, mobile.trim(), role]
+        [name.trim(), cleanEmail, hashPassword(password), mobile.trim(), role]
       );
       const userId = userResult.insertId;
 
-      // Insert role-specific profile
       if (role === 'passenger') {
         await conn.execute(
-          `INSERT INTO passenger_profiles (user_id, default_address, emergency_contact)
-           VALUES (?, ?, ?)`,
+          `INSERT INTO passenger_profiles (user_id, default_address, emergency_contact) VALUES (?, ?, ?)`,
           [userId, default_address || null, emergency_contact || null]
         );
       } else {
         await conn.execute(
-          `INSERT INTO driver_profiles
-             (user_id, license_no, license_expiry, verification_status, availability, rating)
+          `INSERT INTO driver_profiles (user_id, license_no, license_expiry, verification_status, availability, rating)
            VALUES (?, ?, ?, 'pending', 'offline', 0.00)`,
           [userId, license_no.trim(), license_expiry]
         );
@@ -109,14 +148,17 @@ module.exports = function authRoute(router) {
 
       await conn.commit();
 
-      await logAction({
-        userId,
-        action:      'REGISTER',
-        description: `New ${role} registered: ${email}`,
-        ip:          getClientIp(req),
-      });
+      await logAction({ userId, action: 'REGISTER', description: `New ${role} registered: ${cleanEmail}`, ip: getClientIp(req) });
 
-      req.sendJSON(201, { success: true, message: 'Registration successful! Please log in.' });
+      const user = { user_id: userId, name: name.trim(), email: cleanEmail, mobile: mobile.trim(), role };
+      req.sendJSON(201, {
+        success: true,
+        message: role === 'driver'
+          ? 'Registration successful. Your driver account is pending admin verification.'
+          : 'Registration successful. Welcome to Rydio!',
+        token: issueToken(user),
+        user:  publicUser(user),
+      });
     } catch (err) {
       await conn.rollback();
       console.error('[auth/register]', err.message);
@@ -127,95 +169,41 @@ module.exports = function authRoute(router) {
   });
 
   // ── POST /api/auth/login ─────────────────────────────────
-  router.post('/api/auth/login', async (req, res) => {
-    let { email, password } = req.body;
-
+  router.post('/api/auth/login', async (req) => {
+    const { email, password } = req.body || {};
     if (!email || !password) {
       return req.sendJSON(400, { success: false, message: 'Email and password are required.' });
     }
 
-    const trimmedInput = (email || '').toLowerCase().trim();
-    const aliasMap = {
-      superadmin: 'superadmin@cab.com',
-      admin: 'admin@cab.com',
-      admin1: 'admin@cab.com',
-      admin2: 'admin2@cab.com',
-      driver: 'driver1@cab.com',
-      driver1: 'driver1@cab.com',
-      passenger: 'passenger1@cab.com',
-      passenger1: 'passenger1@cab.com',
-    };
-    const lookupEmail = aliasMap[trimmedInput] || (trimmedInput.includes('@') ? trimmedInput : `${trimmedInput}@cab.com`);
+    const lookupEmail = resolveLoginEmail(email);
 
     try {
       const [rows] = await pool.execute(
-        `SELECT user_id, name, email, password, mobile, role, status
-         FROM users WHERE email = ?`,
+        `SELECT user_id, name, email, password, mobile, role, status FROM users WHERE email = ?`,
         [lookupEmail]
       );
-
-      let user = rows && rows.length > 0 ? rows[0] : null;
-
-      // Fallback in-memory demo users if DB is temporarily unreachable or empty
-      if (!user) {
-        const DEMO_FALLBACK = {
-          'superadmin@cab.com': { user_id: 1, name: 'Super Administrator', email: 'superadmin@cab.com', role: 'superadmin', status: 'active', pass: 'SuperAdmin@123' },
-          'admin@cab.com':      { user_id: 2, name: 'Operations Admin', email: 'admin@cab.com', role: 'admin', status: 'active', pass: 'Admin@123' },
-          'admin2@cab.com':     { user_id: 3, name: 'Fleet Supervisor Admin', email: 'admin2@cab.com', role: 'admin', status: 'active', pass: 'Admin@123' },
-          'driver1@cab.com':    { user_id: 4, name: 'Rajesh Kumar', email: 'driver1@cab.com', role: 'driver', status: 'active', pass: 'Driver@123' },
-          'driver2@cab.com':    { user_id: 5, name: 'Suresh Sharma', email: 'driver2@cab.com', role: 'driver', status: 'active', pass: 'Driver@123' },
-          'passenger1@cab.com': { user_id: 9, name: 'Aravind Passenger', email: 'passenger1@cab.com', role: 'passenger', status: 'active', pass: 'Pass@123' },
-          'passenger2@cab.com': { user_id: 10, name: 'Priya Mohan', email: 'passenger2@cab.com', role: 'passenger', status: 'active', pass: 'Pass@123' }
-        };
-        const fallback = DEMO_FALLBACK[lookupEmail];
-        if (fallback && (password === fallback.pass || password === 'Demo@123' || password === 'password123')) {
-          user = fallback;
-        }
-      }
+      const user = rows && rows.length > 0 ? rows[0] : null;
 
       if (!user) {
         return req.sendJSON(401, { success: false, message: 'Invalid email or password.' });
       }
-
       if (user.status === 'blocked') {
         return req.sendJSON(403, { success: false, message: 'Your account has been blocked. Contact support.' });
       }
       if (user.status === 'inactive') {
         return req.sendJSON(403, { success: false, message: 'Your account is inactive.' });
       }
-      const devBypassPasswords = ['password123', 'Demo@123', 'Pass@123', 'Driver@123', 'Admin@123', 'SuperAdmin@123', 'Test@1234'];
-      const isPassValid = (user.password && verifyPassword(password, user.password)) || devBypassPasswords.includes(password);
+
+      const demoPassword = DEMO_ACCOUNTS[user.email];
+      const isDemoLogin  = Boolean(demoPassword) && (password === demoPassword || password === DEMO_SHORTCUT_PASSWORD);
+      const isPassValid  = isDemoLogin || verifyPassword(password, user.password);
       if (!isPassValid) {
         return req.sendJSON(401, { success: false, message: 'Invalid email or password.' });
       }
 
-      // Create 24-hour token
-      const token = createToken({
-        user_id: user.user_id,
-        name:    user.name,
-        email:   user.email,
-        role:    user.role,
-        exp:     Math.floor(Date.now() / 1000) + 86400,
-      });
+      await logAction({ userId: user.user_id, action: 'LOGIN', description: `Login: ${user.email}`, ip: getClientIp(req) });
 
-      await logAction({
-        userId:      user.user_id,
-        action:      'LOGIN',
-        description: `Login: ${email}`,
-        ip:          getClientIp(req),
-      });
-
-      req.sendJSON(200, {
-        success: true,
-        message: 'Login successful',
-        token,
-        user: {
-          user_id: user.user_id,
-          name:    user.name,
-          email:   user.email,
-          role:    user.role,
-        },
-      });
+      req.sendJSON(200, { success: true, message: 'Login successful', token: issueToken(user), user: publicUser(user) });
     } catch (err) {
       console.error('[auth/login]', err.message);
       req.sendJSON(500, { success: false, message: 'Login failed. Please try again.' });
@@ -223,30 +211,26 @@ module.exports = function authRoute(router) {
   });
 
   // ── POST /api/auth/logout ────────────────────────────────
-  router.post('/api/auth/logout', async (req, res) => {
-    // Stateless — client removes token from sessionStorage
+  router.post('/api/auth/logout', async (req) => {
+    // Stateless tokens: the client discards its copy.
     req.sendJSON(200, { success: true, message: 'Logged out successfully.' });
   });
 
   // ── GET /api/auth/me ─────────────────────────────────────
-  router.get('/api/auth/me', async (req, res) => {
+  router.get('/api/auth/me', async (req) => {
     const guard = requireRole(null)(req);
     if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
 
     try {
       const [rows] = await pool.execute(
-        `SELECT user_id, name, email, mobile, role, status, created_at
-         FROM users WHERE user_id = ?`,
+        `SELECT user_id, name, email, mobile, role, status, created_at FROM users WHERE user_id = ?`,
         [guard.user.user_id]
       );
-      if (rows.length === 0) {
-        return req.sendJSON(404, { success: false, message: 'User not found.' });
-      }
+      if (rows.length === 0) return req.sendJSON(404, { success: false, message: 'User not found.' });
       req.sendJSON(200, { success: true, user: rows[0] });
     } catch (err) {
       console.error('[auth/me]', err.message);
       req.sendJSON(500, { success: false, message: 'Server error.' });
     }
   });
-
 };

@@ -1,147 +1,80 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../services/api';
-import { DollarSign, Navigation, Star, CheckCircle2, Clock, MapPin, TrendingUp, ArrowDownRight, ShieldCheck } from 'lucide-react';
+import { api, errorMessage } from '../../services/api';
+import { Wallet, Navigation, Route, TrendingUp } from 'lucide-react';
 import AppShell from '../../components/ui/AppShell';
-import { KPICard, EmptyState, Skeleton, StatusBadge } from '../../components/ui/UIKit';
+import { KPICard, EmptyState, SkeletonKPIs, SkeletonRows, StatusBadge, Tabs, Alert } from '../../components/ui/UIKit';
+import { formatCurrency, formatDate, formatDistance, capitalize } from '../../utils/format';
+
+const PERIODS = [
+  { id: 'today', label: 'Today' },
+  { id: 'week',  label: 'Last 7 days' },
+  { id: 'month', label: 'Last 30 days' },
+  { id: 'all',   label: 'All time' },
+];
 
 export default function DriverEarnings() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['driverEarnings'],
-    queryFn: () => api.get('/driver/earnings').then((r) => r.data),
+  const [period, setPeriod] = useState('all');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['driverEarnings', period],
+    queryFn: () => api.get('/driver/earnings', { params: { period } }).then((r) => r.data),
   });
 
-  const earnings = data?.earnings || data || {};
-  const trips = earnings.trips || earnings.recent_trips || [];
-  const totalEarnings = earnings.total_earnings || earnings.total || earnings.summary?.total_earnings || 0;
-  const tripCount = earnings.trip_count || trips.length || earnings.summary?.total_trips || 0;
-  const avgRating = earnings.avg_rating || earnings.summary?.rating || '4.95';
+  const summary = data?.summary || {};
+  const trips   = data?.trips || [];
 
   return (
-    <AppShell title="Driver Earnings & Settlement" subtitle="Financial analytics, fare disbursements and payout statements">
+    <AppShell title="Earnings" subtitle="Completed trips and fare settlements">
       <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Tabs tabs={PERIODS} value={period} onChange={setPeriod} />
+          <span className="text-xs text-slate-500">{trips.length} completed trip{trips.length === 1 ? '' : 's'}</span>
+        </div>
 
-        {/* Financial KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="card p-5 space-y-3">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-28" />
-              </div>
-            ))
-          ) : (
+        {error && <Alert type="error">{errorMessage(error, 'Could not load earnings.')}</Alert>}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? <SkeletonKPIs /> : (
             <>
-              <KPICard
-                label="Total Net Payout"
-                value={`₹${Number(totalEarnings).toFixed(2)}`}
-                icon={DollarSign}
-                gradient="linear-gradient(135deg,#16A34A,#15803D)"
-                accentBg
-                trendLabel="Direct instant settlement"
-              />
-              <KPICard
-                label="Fulfilled Trips"
-                value={tripCount}
-                icon={Navigation}
-                gradient="linear-gradient(135deg,#3B82F6,#1D4ED8)"
-                trendLabel="100% acceptance bonus"
-              />
-              <KPICard
-                label="Partner Rating"
-                value={avgRating}
-                icon={Star}
-                gradient="linear-gradient(135deg,#F59E0B,#D97706)"
-                trendLabel="Premier Tier Partner"
-              />
+              <KPICard label="Total earnings" value={formatCurrency(summary.total_earnings ?? 0)} icon={Wallet} tone="brand" />
+              <KPICard label="Completed trips" value={summary.total_trips ?? 0} icon={Navigation} tone="blue" />
+              <KPICard label="Average fare" value={formatCurrency(summary.avg_fare ?? 0, { decimals: 0 })} icon={TrendingUp} tone="amber" />
+              <KPICard label="Distance driven" value={formatDistance(summary.total_km ?? 0)} icon={Route} tone="slate" />
             </>
           )}
         </div>
 
-        {/* Payout Summary Info */}
-        <div className="card p-5 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
-              <ShieldCheck size={20} />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-emerald-950 uppercase tracking-wider">Fast Settlement Guarantee</div>
-              <div className="text-xs text-slate-500 mt-0.5">Fares are credited immediately upon passenger drop-off with 0% platform hidden fees.</div>
-            </div>
-          </div>
-          <span className="badge bg-emerald-100 text-emerald-800 text-xs px-3 py-1 font-bold">
-            Auto-Settlement Active
-          </span>
-        </div>
-
-        {/* Trips Statement Table */}
         <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Recent Trip Payout Ledger</h3>
-            <span className="text-xs font-bold text-slate-500">{trips.length} transactions</span>
-          </div>
-
-          {isLoading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="w-10 h-10 rounded-xl" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                  <Skeleton className="h-6 w-20 rounded-full" />
-                </div>
-              ))}
+          <div className="card-header">
+            <div>
+              <div className="card-title">Trip ledger</div>
+              <div className="card-subtitle">Fares are credited when a trip is completed</div>
             </div>
-          ) : trips.length === 0 ? (
-            <EmptyState
-              icon={DollarSign}
-              title="No Payouts Yet"
-              description="Complete passenger rides from your Driver Cockpit to generate earnings statements."
-            />
+          </div>
+          {isLoading ? <SkeletonRows rows={4} /> : trips.length === 0 ? (
+            <EmptyState icon={Wallet} title="No completed trips in this period" description="Earnings appear here after you complete trips." />
           ) : (
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
-                  <tr>
-                    <th>Trip ID</th>
-                    <th>Route</th>
-                    <th>Distance</th>
-                    <th>Completed Time</th>
-                    <th>Net Payout</th>
-                    <th>Status</th>
-                  </tr>
+                  <tr><th>Trip</th><th>Route</th><th>Passenger</th><th>Distance</th><th>Completed</th><th>Payment</th><th>Fare</th></tr>
                 </thead>
                 <tbody>
                   {trips.map((t) => (
-                    <tr key={t.trip_id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={t.trip_id}>
+                      <td><span className="font-mono text-xs font-semibold text-slate-700">#{t.trip_id}</span></td>
                       <td>
-                        <span className="font-mono text-xs font-bold text-slate-600">#{t.trip_id}</span>
+                        <div className="font-medium text-slate-900 max-w-[260px] truncate">{t.pickup_location} → {t.destination}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{capitalize(t.vehicle_type)}</div>
                       </td>
-                      <td>
-                        <div className="text-xs font-bold text-slate-900 max-w-xs truncate">
-                          {t.pickup_location} → {t.destination}
-                        </div>
+                      <td className="text-slate-700 whitespace-nowrap">{t.passenger_name || '—'}</td>
+                      <td className="text-slate-700 whitespace-nowrap">{formatDistance(t.distance_km)}</td>
+                      <td className="text-slate-600 whitespace-nowrap">{formatDate(t.end_time || t.start_time)}</td>
+                      <td className="whitespace-nowrap">
+                        {t.payment_status ? <><StatusBadge status={t.payment_status} /><div className="text-[11px] text-slate-400 mt-1 capitalize">{t.payment_method}</div></> : <span className="text-slate-400">—</span>}
                       </td>
-                      <td>
-                        <span className="text-xs text-slate-600 font-medium">
-                          {t.distance_km ? `${t.distance_km} km` : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                          <Clock size={11} />
-                          <span>{t.end_time || t.start_time || 'Recent'}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="text-xs font-black text-emerald-700">
-                          +₹{t.fare || t.amount || '0'}
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={t.trip_status || 'completed'} />
-                      </td>
+                      <td className="font-semibold text-emerald-700 whitespace-nowrap">+{formatCurrency(t.fare)}</td>
                     </tr>
                   ))}
                 </tbody>

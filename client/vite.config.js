@@ -21,4 +21,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('leaflet')) return 'vendor-map';
+          if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+          return 'vendor';
+        },
+      },
+    },
+  },
 })

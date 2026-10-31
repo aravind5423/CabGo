@@ -1,338 +1,235 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
-import { useTripStore } from '../../store/tripStore';
-import { api } from '../../services/api';
+import { api, streamUrl, errorMessage } from '../../services/api';
 import { socket } from '../../services/socket';
 import LeafletMap from '../../components/map/LeafletMap';
 import AppShell from '../../components/ui/AppShell';
-import { KPICard, StatusBadge, EmptyState, Skeleton, Toast } from '../../components/ui/UIKit';
-import {
-  Power, CheckCircle2, XCircle, MapPin, Clock, DollarSign, Loader2,
-  Navigation, Car, Award, ShieldCheck, Play, Flag, Wifi, Radio, ChevronRight
-} from 'lucide-react';
+import { KPICard, StatusBadge, EmptyState, SkeletonKPIs, Skeleton, Toast, useToast, Spinner, Alert, RouteLabel, IconChip } from '../../components/ui/UIKit';
+import { Power, CheckCircle2, X, Car, Wallet, Play, Flag, Radio, Phone, Star, Navigation, Clock, User } from 'lucide-react';
+import { formatCurrency, formatDate, formatDistance, capitalize, timeAgo } from '../../utils/format';
 import clsx from 'clsx';
 
 export default function DriverDashboard() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const { setDriverLocation, driverLocation } = useTripStore();
+  const [toast, showToast] = useToast();
+  const [dismissed, setDismissed] = useState(() => new Set());
+  const [telemetry, setTelemetry] = useState(null);
 
-  const [toastMsg, setToastMsg] = useState('');
-  const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3500); };
-
-  // Fetch driver dashboard
-  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+  const { data, isLoading, error: dashError } = useQuery({
     queryKey: ['driverDashboard'],
     queryFn: () => api.get('/driver/dashboard').then((r) => r.data),
     refetchInterval: 5000,
   });
 
-  const driver = dashboardData?.driver || {};
-  const vehicle = dashboardData?.vehicle || {};
-  const stats = dashboardData?.stats || {};
-  const activeTrip = dashboardData?.activeTrip || null;
-  const recentTrips = dashboardData?.recentTrips || [];
-  const isOnline = driver.availability === 'online';
+  const driver      = data?.driver || {};
+  const vehicle     = data?.vehicle || null;
+  const stats       = data?.stats || {};
+  const activeTrip  = data?.activeTrip || null;
+  const recentTrips = data?.recentTrips || [];
+  const isOnline    = driver.availability === 'online';
+  const isApproved  = !driver.verification_status || driver.verification_status === 'approved';
 
-  // Fetch pending ride requests
-  const { data: requestsData, isLoading: isRequestsLoading } = useQuery({
+  const { data: requestsData, isFetching: fetchingRequests } = useQuery({
     queryKey: ['rideRequests'],
     queryFn: () => api.get('/driver/ride-requests').then((r) => r.data),
     enabled: isOnline && !activeTrip,
     refetchInterval: isOnline && !activeTrip ? 4000 : false,
   });
-  const requests = requestsData?.requests || requestsData?.data || [];
+  const requests = (requestsData?.requests || []).filter((r) => !dismissed.has(r.request_id));
 
-  // Toggle availability
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
+  };
+
   const availabilityMutation = useMutation({
-    mutationFn: (newStatus) =>
-      api.put('/driver/availability', { availability: newStatus ? 'online' : 'offline', is_available: newStatus }),
-    onSuccess: (_, newStatus) => {
-      showToast(newStatus ? 'Radar Online — Receiving ride dispatch requests' : 'Went Offline');
-      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to update status.'),
+    mutationFn: (online) => api.put('/driver/availability', { availability: online ? 'online' : 'offline' }),
+    onSuccess: (_, online) => { showToast(online ? 'You are online and receiving requests.' : 'You are now offline.'); invalidate(); },
+    onError: (err) => showToast(errorMessage(err, 'Failed to update availability.'), 'error'),
   });
 
   const acceptMutation = useMutation({
     mutationFn: (id) => api.put(`/driver/ride-requests/${id}/accept`),
-    onSuccess: () => {
-      showToast('Ride accepted! Route loaded onto HUD.');
-      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to accept ride.'),
+    onSuccess: () => { showToast('Ride accepted. Head to the pickup point.'); invalidate(); },
+    onError: (err) => { showToast(errorMessage(err, 'Failed to accept ride.'), 'error'); invalidate(); },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id) => api.put(`/driver/ride-requests/${id}/reject`),
-    onSuccess: () => {
-      showToast('Ride declined.');
-      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
-    },
+    onSuccess: (_, id) => { setDismissed((s) => new Set(s).add(id)); showToast('Request declined.', 'info'); },
   });
 
-  const startTripMutation = useMutation({
+  const startMutation = useMutation({
     mutationFn: (tripId) => api.put(`/driver/trips/${tripId}/start`),
-    onSuccess: () => {
-      showToast('Trip started! Driving towards destination.');
-      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to start trip.'),
+    onSuccess: () => { showToast('Trip started.'); invalidate(); },
+    onError: (err) => showToast(errorMessage(err, 'Failed to start trip.'), 'error'),
   });
 
-  const completeTripMutation = useMutation({
-    mutationFn: (tripId) => api.put(`/driver/trips/${tripId}/complete`, {}),
-    onSuccess: () => {
-      showToast('Trip successfully completed! Earnings credited.');
-      queryClient.invalidateQueries({ queryKey: ['driverDashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['rideRequests'] });
-    },
-    onError: (err) => showToast(err.response?.data?.message || 'Failed to complete trip.'),
+  const completeMutation = useMutation({
+    mutationFn: (tripId) => api.put(`/driver/trips/${tripId}/complete`, { payment_method: 'cash' }),
+    onSuccess: (res) => { showToast(`Trip completed. Fare collected: ${formatCurrency(res.data?.fare)}`); setTelemetry(null); invalidate(); },
+    onError: (err) => showToast(errorMessage(err, 'Failed to complete trip.'), 'error'),
   });
 
-  // GPS & Socket heartbeat
+  // Live trip telemetry (server simulation via SSE) + relay position over Socket.IO to the passenger room.
+  const activeTripId = activeTrip?.trip_id;
+  const activeStatus = activeTrip?.trip_status;
   useEffect(() => {
-    if (!isOnline) {
-      socket.disconnect();
-      return;
-    }
-    socket.connect();
-    if (!driverLocation) setDriverLocation([13.0827, 80.2707]);
-    let geoWatch;
-    if (navigator.geolocation) {
-      geoWatch = navigator.geolocation.watchPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setDriverLocation([coords.lat, coords.lng]);
-          const tripId = activeTrip?.trip_id || activeTrip?.request_id;
-          if (tripId) {
-            socket.emit('driver:location', { trip_id: tripId, ...coords });
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 5000 }
-      );
-    }
-    return () => {
-      socket.disconnect();
-      if (geoWatch !== undefined) navigator.geolocation.clearWatch(geoWatch);
-    };
-  }, [isOnline, activeTrip?.trip_id, setDriverLocation, driverLocation]);
+    if (!activeTripId) { setTelemetry(null); return undefined; }
 
-  const activeTripId = activeTrip?.trip_id || activeTrip?.request?.trip_id;
-  const activeTripStatus = activeTrip?.trip_status || activeTrip?.request?.trip_status || 'accepted';
+    const es = new EventSource(streamUrl(`/stream/trip/${activeTripId}`));
+    socket.connect();
+    socket.emit('join:trip', activeTripId);
+
+    es.addEventListener('telemetry', (e) => {
+      try {
+        const t = JSON.parse(e.data);
+        setTelemetry(t);
+        socket.emit('driver:ping_location', { tripId: activeTripId, lat: t.lat, lng: t.lng, bearing: t.bearing });
+      } catch { /* ignore */ }
+    });
+    es.addEventListener('ride_cancelled', () => { showToast('The passenger cancelled this ride.', 'error'); invalidate(); });
+    es.addEventListener('trip_arrived', () => showToast('Vehicle has arrived at the destination.', 'info'));
+
+    return () => { es.close(); socket.disconnect(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTripId]);
+
+  const vehiclePos = telemetry?.lat && telemetry?.lng ? [telemetry.lat, telemetry.lng] : null;
 
   return (
     <AppShell
-      title="Driver Partner Cockpit"
-      subtitle={
-        <span className={clsx('flex items-center gap-2 text-xs font-bold', isOnline ? 'text-emerald-600' : 'text-slate-500')}>
-          <span className={clsx('w-2 h-2 rounded-full', isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400')} />
-          {isOnline ? 'System Online — Accepting dispatch requests' : 'System Offline — Standby mode'}
-        </span>
+      title="Driver dashboard"
+      subtitle={isOnline ? 'Online — receiving ride requests' : 'Offline'}
+      action={
+        <button
+          onClick={() => availabilityMutation.mutate(!isOnline)}
+          disabled={availabilityMutation.isPending || isLoading || (!isOnline && !isApproved)}
+          className={clsx(isOnline ? 'btn-danger-soft' : 'btn-primary')}
+        >
+          {availabilityMutation.isPending ? <Spinner size={15} /> : <Power size={15} />}
+          {isOnline ? 'Go offline' : 'Go online'}
+        </button>
       }
     >
-      <Toast message={toastMsg} />
-
+      <Toast toast={toast} />
       <div className="space-y-6">
-        {/* Cockpit Top Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Availability Toggle */}
-          <div
-            className={clsx(
-              'card p-5 flex flex-col justify-between transition-all duration-300 relative overflow-hidden',
-              isOnline
-                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/40 shadow-lg shadow-emerald-500/10'
-                : 'bg-white border-slate-200'
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Radar</span>
-                <div className={clsx('text-base font-extrabold mt-0.5', isOnline ? 'text-emerald-700' : 'text-slate-600')}>
-                  {isOnline ? 'Online (Beacon Active)' : 'Offline (Paused)'}
-                </div>
-              </div>
-              <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center shadow-sm', isOnline ? 'bg-emerald-500 text-white shadow-emerald-500/30' : 'bg-slate-100 text-slate-400')}>
-                <Power size={20} />
-              </div>
-            </div>
+        {dashError && <Alert type="error">{errorMessage(dashError, 'Could not load your dashboard.')}</Alert>}
 
-            <button
-              onClick={() => availabilityMutation.mutate(!isOnline)}
-              disabled={availabilityMutation.isPending}
-              className={clsx(
-                'w-full py-2.5 rounded-xl text-xs font-bold transition-all mt-4 cursor-pointer shadow-sm',
-                isOnline
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                  : 'btn-primary'
-              )}
-            >
-              {availabilityMutation.isPending ? (
-                <Loader2 size={15} className="animate-spin mx-auto" />
-              ) : isOnline ? (
-                'Switch to Offline'
-              ) : (
-                'Go Live & Online'
-              )}
-            </button>
-          </div>
+        {!isLoading && !isApproved && (
+          <Alert type={driver.verification_status === 'rejected' ? 'error' : 'warning'}>
+            {driver.verification_status === 'rejected'
+              ? 'Your driver application was rejected. Please contact support.'
+              : 'Your account is pending verification by an operations admin. You can manage your vehicles now and go online once approved.'}
+          </Alert>
+        )}
 
-          {/* KPI Cards */}
-          {isDashboardLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="card p-5 space-y-3">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-8 w-16" />
-              </div>
-            ))
-          ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? <SkeletonKPIs /> : (
             <>
-              <KPICard
-                label="Total Trips"
-                value={stats.total_trips ?? 0}
-                icon={Car}
-                gradient="linear-gradient(135deg,#3B82F6,#1D4ED8)"
-              />
-              <KPICard
-                label="Today's Trips"
-                value={stats.today_trips ?? 0}
-                icon={Navigation}
-                gradient="linear-gradient(135deg,#F59E0B,#D97706)"
-              />
-              <KPICard
-                label="Total Earnings"
-                value={`₹${stats.total_earnings ?? 0}`}
-                icon={DollarSign}
-                gradient="linear-gradient(135deg,#16A34A,#15803D)"
-                accentBg
-              />
+              <KPICard label="Today's earnings" value={formatCurrency(stats.today_earnings ?? 0)} icon={Wallet} tone="brand" hint={`${stats.today_trips ?? 0} trip${stats.today_trips === 1 ? '' : 's'} today`} />
+              <KPICard label="Total earnings" value={formatCurrency(stats.total_earnings ?? 0)} icon={Wallet} tone="amber" />
+              <KPICard label="Completed trips" value={stats.completed_trips ?? 0} icon={CheckCircle2} tone="blue" hint={`${stats.cancelled_trips ?? 0} cancelled`} />
+              <KPICard label="Rating" value={Number(driver.rating || 0).toFixed(2)} icon={Star} tone="amber" hint="out of 5" />
             </>
           )}
         </div>
 
-        {/* Content Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Driver Credentials Sidebar */}
+          {/* Left column: profile + vehicle */}
           <div className="space-y-4">
-            {/* Vehicle Card */}
-            {vehicle?.vehicle_number && (
-              <div className="card p-5 space-y-3 bg-gradient-to-br from-white to-slate-50">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Fleet Assigned</div>
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center text-2xl flex-shrink-0">
-                    🚘
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono font-black text-slate-900 text-sm tracking-wider uppercase">
-                      {vehicle.vehicle_number}
-                    </div>
-                    <div className="text-xs text-slate-500 capitalize mt-0.5">
-                      {vehicle.model} • {vehicle.vehicle_type}
-                    </div>
-                    <div className="text-[11px] text-emerald-600 font-bold mt-1">
-                      {vehicle.capacity || 4} Passenger Capacity
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Profile & Rating */}
-            <div className="card p-5 space-y-3">
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Partner Profile</div>
+            <div className="card p-5">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white font-black text-lg flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
+                <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white font-semibold text-lg flex items-center justify-center flex-shrink-0">
                   {user?.name?.[0]?.toUpperCase() || 'D'}
                 </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">{user?.name}</div>
-                  <div className="badge bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold mt-0.5">
-                    <ShieldCheck size={11} className="inline mr-1" /> Approved Commercial Driver
-                  </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{driver.name || user?.name}</div>
+                  <div className="text-xs text-slate-500 truncate">{driver.email || user?.email}</div>
                 </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">Partner Rating</span>
-                <span className="font-bold text-amber-500 flex items-center gap-1">
-                  <Award size={14} /> {driver.rating || '4.95'} / 5.0
-                </span>
+              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs">
+                <div className="flex items-center justify-between"><span className="text-slate-500">Verification</span><StatusBadge status={driver.verification_status || 'approved'} /></div>
+                <div className="flex items-center justify-between"><span className="text-slate-500">Availability</span><StatusBadge status={driver.availability || 'offline'} /></div>
+                <div className="flex items-center justify-between"><span className="text-slate-500">Licence</span><span className="font-mono text-slate-700">{driver.license_no || '—'}</span></div>
               </div>
+            </div>
+
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Active vehicle</div>
+                <Link to="/driver/vehicles" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">Manage</Link>
+              </div>
+              {isLoading ? (
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-xl" />
+                  <div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-28" /><Skeleton className="h-3 w-40" /></div>
+                </div>
+              ) : vehicle ? (
+                <div className="flex items-center gap-3">
+                  <IconChip icon={Car} tone="slate" />
+                  <div className="min-w-0">
+                    <div className="font-mono font-semibold text-slate-900 text-sm">{vehicle.vehicle_number}</div>
+                    <div className="text-xs text-slate-500 truncate">{vehicle.model} · {capitalize(vehicle.vehicle_type)} · {vehicle.capacity} seats</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">No vehicle registered yet. Add one to receive requests.</p>
+              )}
             </div>
           </div>
 
-          {/* Center Main: Active Trip / Incoming Stream */}
+          {/* Main column */}
           <div className="lg:col-span-2 space-y-5">
-            {/* Active Trip HUD */}
             {activeTrip && (
-              <div className="card overflow-hidden border-emerald-500/40 shadow-xl">
-                <div className="p-4 bg-emerald-50/80 border-b border-emerald-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
-                      Live Trip #{activeTripId} Active
-                    </span>
+              <div className="card overflow-hidden border-emerald-200">
+                <div className="card-header bg-emerald-50/60">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                    <span className="live-dot" /> Current trip #{activeTripId}
                   </div>
-                  <StatusBadge status={activeTripStatus} />
+                  <StatusBadge status={activeStatus} />
                 </div>
-
-                {/* Map */}
-                <div className="h-60 w-full">
-                  <LeafletMap
-                    pickupCoords={activeTrip.pickup_location}
-                    dropCoords={activeTrip.destination}
-                    driverCoords={driverLocation}
-                    height="100%"
-                    theme="voyager"
-                  />
+                <div className="h-64">
+                  <LeafletMap pickupCoords={activeTrip.pickup_location} dropCoords={activeTrip.destination} driverCoords={vehiclePos} bearing={telemetry?.bearing || 0} />
                 </div>
-
-                <div className="p-5 space-y-3.5">
-                  <div className="flex items-start gap-3">
-                    <MapPin size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Pickup Location</div>
-                      <div className="text-xs font-bold text-slate-900">{activeTrip.pickup_location}</div>
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <RouteLabel pickup={activeTrip.pickup_location} destination={activeTrip.destination} />
+                    <div className="flex items-center gap-3 sm:justify-end">
+                      <IconChip icon={User} tone="blue" size="sm" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-slate-900 truncate">{activeTrip.passenger_name}</div>
+                        {activeTrip.passenger_mobile && (
+                          <a href={`tel:${activeTrip.passenger_mobile}`} className="text-xs text-emerald-700 font-medium flex items-center gap-1"><Phone size={11} /> {activeTrip.passenger_mobile}</a>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Navigation size={16} className="text-rose-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Destination Drop-off</div>
-                      <div className="text-xs font-bold text-slate-900">{activeTrip.destination}</div>
+                  {telemetry && activeStatus === 'in_progress' && (
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="rounded-lg bg-slate-50 p-2.5"><div className="text-[11px] text-slate-500">Speed</div><div className="text-sm font-semibold text-slate-900">{telemetry.speed_kmh ?? 0} km/h</div></div>
+                      <div className="rounded-lg bg-slate-50 p-2.5"><div className="text-[11px] text-slate-500">ETA</div><div className="text-sm font-semibold text-slate-900">{telemetry.eta_minutes ?? '—'} min</div></div>
+                      <div className="rounded-lg bg-slate-50 p-2.5"><div className="text-[11px] text-slate-500">Progress</div><div className="text-sm font-semibold text-slate-900">{telemetry.progress_percent ?? 0}%</div></div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                    <span className="text-xs text-slate-500 font-medium">Settled Fare</span>
-                    <span className="text-xl font-black text-slate-900">₹{activeTrip.estimated_fare || activeTrip.fare || '—'}</span>
-                  </div>
-
-                  {/* Trip Controls */}
-                  <div className="flex gap-3 pt-2">
-                    {activeTripStatus === 'accepted' && (
-                      <button
-                        onClick={() => startTripMutation.mutate(activeTripId)}
-                        disabled={startTripMutation.isPending}
-                        className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
-                      >
-                        {startTripMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-                        Start Passenger Trip
+                  <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] text-slate-500">Fare</div>
+                      <div className="text-xl font-semibold text-slate-900">{formatCurrency(activeTrip.fare ?? activeTrip.estimated_fare)}</div>
+                    </div>
+                    {activeStatus === 'accepted' && (
+                      <button onClick={() => startMutation.mutate(activeTripId)} disabled={startMutation.isPending} className="btn-primary btn-lg">
+                        {startMutation.isPending ? <Spinner size={15} /> : <Play size={15} />} Start trip
                       </button>
                     )}
-                    {activeTripStatus === 'in_progress' && (
-                      <button
-                        onClick={() => completeTripMutation.mutate(activeTripId)}
-                        disabled={completeTripMutation.isPending}
-                        className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
-                      >
-                        {completeTripMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Flag size={16} />}
-                        Complete Trip & Settle Fare
+                    {activeStatus === 'in_progress' && (
+                      <button onClick={() => completeMutation.mutate(activeTripId)} disabled={completeMutation.isPending} className="btn-primary btn-lg">
+                        {completeMutation.isPending ? <Spinner size={15} /> : <Flag size={15} />} Complete trip
                       </button>
                     )}
                   </div>
@@ -340,61 +237,36 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* Incoming Requests Feed */}
-            {isOnline && !activeTrip && (
+            {!activeTrip && isOnline && (
               <div className="card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
+                <div className="card-header">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Incoming Dispatch Feed</h3>
-                    <span className="badge bg-emerald-100 text-emerald-800 text-[10px] font-bold">Live Stream</span>
+                    <div className="card-title">Incoming requests</div>
+                    {vehicle && <span className="badge badge-neutral">{capitalize(vehicle.vehicle_type)}</span>}
                   </div>
-                  {isRequestsLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
+                  {fetchingRequests && <Spinner size={14} className="text-slate-400" />}
                 </div>
-
                 {requests.length === 0 ? (
-                  <EmptyState
-                    icon={Radio}
-                    title="Scanning for nearby ride bookings..."
-                    description="You are active on the dispatch grid. As soon as passengers book, requests will appear here with live routing."
-                  />
+                  <EmptyState icon={Radio} title="Waiting for ride requests" description="You're online. New bookings matching your vehicle type will show up here." compact />
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {requests.map((req) => (
-                      <div key={req.request_id} className="p-5 hover:bg-slate-50 transition-colors">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
-                              <MapPin size={14} className="text-emerald-600 flex-shrink-0" />
-                              <span className="truncate">{req.pickup_location}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-600">
-                              <Navigation size={14} className="text-rose-600 flex-shrink-0" />
-                              <span className="truncate">{req.destination}</span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-base font-black text-slate-900">₹{req.estimated_fare}</span>
-                              <span className="badge bg-slate-100 text-slate-700 capitalize font-medium text-[10px]">
-                                {req.vehicle_type || 'Sedan'}
-                              </span>
-                            </div>
+                      <div key={req.request_id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <RouteLabel pickup={req.pickup_location} destination={req.destination} />
+                          <div className="flex items-center gap-3 mt-2.5 text-xs text-slate-500">
+                            <span className="text-base font-semibold text-slate-900">{formatCurrency(req.estimated_fare)}</span>
+                            <span>{req.passenger_name}</span>
+                            <span className="flex items-center gap-1"><Clock size={11} /> {timeAgo(req.requested_at)}</span>
                           </div>
-
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <button
-                              onClick={() => acceptMutation.mutate(req.request_id)}
-                              disabled={acceptMutation.isPending}
-                              className="btn-primary text-xs px-4 py-2.5 flex-1 sm:flex-initial shadow-md shadow-emerald-500/20"
-                            >
-                              <CheckCircle2 size={15} /> Accept Ride
-                            </button>
-                            <button
-                              onClick={() => rejectMutation.mutate(req.request_id)}
-                              disabled={rejectMutation.isPending}
-                              className="btn-danger text-xs px-3.5 py-2.5"
-                            >
-                              <XCircle size={15} />
-                            </button>
-                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => acceptMutation.mutate(req.request_id)} disabled={acceptMutation.isPending} className="btn-primary flex-1 sm:flex-initial">
+                            {acceptMutation.isPending && acceptMutation.variables === req.request_id ? <Spinner size={14} /> : <CheckCircle2 size={14} />} Accept
+                          </button>
+                          <button onClick={() => rejectMutation.mutate(req.request_id)} disabled={rejectMutation.isPending} className="btn-secondary" aria-label="Decline">
+                            <X size={14} />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -403,52 +275,45 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* Offline Notification */}
-            {!isOnline && !activeTrip && (
-              <div className="card p-10">
+            {!activeTrip && !isOnline && !isLoading && (
+              <div className="card">
                 <EmptyState
                   icon={Power}
-                  title="Driver Radar is Offline"
-                  description="Toggle the switch to go online and start receiving nearby trip dispatch notifications."
-                  action={
-                    <button
-                      onClick={() => availabilityMutation.mutate(true)}
-                      disabled={availabilityMutation.isPending}
-                      className="btn-primary shadow-lg shadow-emerald-500/25"
-                    >
-                      Connect & Go Online
+                  title="You're offline"
+                  description={isApproved ? 'Go online to start receiving ride requests near you.' : 'You can go online once your account has been verified.'}
+                  action={isApproved && (
+                    <button onClick={() => availabilityMutation.mutate(true)} disabled={availabilityMutation.isPending} className="btn-primary">
+                      <Power size={15} /> Go online
                     </button>
-                  }
+                  )}
                 />
               </div>
             )}
 
-            {/* Recent Trips Table */}
-            {recentTrips.length > 0 && (
-              <div className="card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Completed Journeys Today</h3>
-                </div>
+            <div className="card overflow-hidden">
+              <div className="card-header">
+                <div className="card-title">Recent trips</div>
+                <Link to="/driver/earnings" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">Earnings</Link>
+              </div>
+              {recentTrips.length === 0 ? (
+                <EmptyState icon={Navigation} title="No trips yet" description="Completed trips will appear here." compact />
+              ) : (
                 <div className="divide-y divide-slate-100">
-                  {recentTrips.map((trip) => (
-                    <div key={trip.trip_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {trip.pickup_location} → {trip.destination}
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {trip.passenger_name || 'Passenger'} • {trip.start_time || 'Completed'}
-                        </div>
+                  {recentTrips.map((t) => (
+                    <div key={t.trip_id} className="px-5 py-3.5 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium text-slate-900 truncate">{t.pickup_location} → {t.destination}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{t.passenger_name} · {formatDate(t.end_time || t.start_time)}{t.distance_km ? ` · ${formatDistance(t.distance_km)}` : ''}</div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-4">
-                        <div className="text-xs font-black text-emerald-700">+₹{trip.fare}</div>
-                        <StatusBadge status={trip.trip_status} className="mt-0.5" />
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-semibold text-slate-900">{formatCurrency(t.fare)}</div>
+                        <StatusBadge status={t.trip_status} className="mt-1" />
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -45,7 +45,7 @@ module.exports = function paymentsRoute(router) {
       return req.sendJSON(400, { success: false, message: 'Valid trip_id is required.' });
     }
 
-    const validMethods = ['cash', 'card', 'wallet'];
+    const validMethods = ['cash', 'card', 'wallet', 'upi'];
     if (!validMethods.includes(payment_method)) {
       return req.sendJSON(400, {
         success: false,

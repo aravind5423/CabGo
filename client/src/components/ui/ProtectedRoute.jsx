@@ -1,31 +1,26 @@
 import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore, ROLE_HOME } from '../../store/authStore';
 
 /**
- * Role-based protected route guard.
- * Redirects unauthenticated users to /login.
- * Redirects users with wrong role to their own dashboard.
- * Note: Superadmins inherit access to admin routes.
+ * Role-based route guard.
+ * - Unauthenticated users go to /login.
+ * - Users with the wrong role are sent to their own dashboard.
+ * - Superadmins may also open admin routes.
  */
 export default function ProtectedRoute({ children, role }) {
   const { token, user } = useAuthStore();
 
-  if (!token || !user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token || !user) return <Navigate to="/login" replace />;
 
-  // Allow superadmin to access admin routes as well
   const hasAccess = !role || user.role === role || (role === 'admin' && user.role === 'superadmin');
-
-  if (!hasAccess) {
-    const dashboardPaths = {
-      passenger: '/passenger/dashboard',
-      driver: '/driver/dashboard',
-      admin: '/admin/dashboard',
-      superadmin: '/superadmin/dashboard',
-    };
-    return <Navigate to={dashboardPaths[user.role] || '/login'} replace />;
-  }
+  if (!hasAccess) return <Navigate to={ROLE_HOME[user.role] || '/login'} replace />;
 
   return children;
+}
+
+/** Sends a signed-in user to their dashboard, otherwise to the login page. */
+export function HomeRedirect() {
+  const { token, user } = useAuthStore();
+  if (token && user) return <Navigate to={ROLE_HOME[user.role] || '/login'} replace />;
+  return <Navigate to="/login" replace />;
 }

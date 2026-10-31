@@ -1,173 +1,141 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, AlertCircle, Info, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
-/* ─── KPI Card ───────────────────────────────────────────────────── */
-export function KPICard({
-  label,
-  value,
-  icon: Icon,
-  gradient = 'linear-gradient(135deg,#16A34A,#15803D)',
-  iconClass = 'text-white',
-  trend,
-  trendLabel,
-  accentBg = false,
-}) {
-  const isPositive = trend !== undefined && trend >= 0;
+/* ─── Tone palette shared by KPI cards & icon chips ──────────── */
+const TONES = {
+  brand: 'bg-emerald-50 text-emerald-700',
+  blue:  'bg-blue-50 text-blue-700',
+  amber: 'bg-amber-50 text-amber-700',
+  rose:  'bg-rose-50 text-rose-700',
+  slate: 'bg-slate-100 text-slate-600',
+  violet:'bg-violet-50 text-violet-700',
+};
 
+export function IconChip({ icon: Icon, tone = 'brand', size = 'md', className }) {
+  const dims = size === 'sm' ? 'w-8 h-8 rounded-lg' : size === 'lg' ? 'w-12 h-12 rounded-xl' : 'w-10 h-10 rounded-xl';
+  const iconSize = size === 'sm' ? 15 : size === 'lg' ? 22 : 18;
   return (
-    <div
-      className={clsx(
-        'card card-hover p-5 flex flex-col justify-between group relative overflow-hidden transition-all duration-300',
-        accentBg && 'border-emerald-500/30 bg-gradient-to-br from-white to-emerald-50/40'
-      )}
-    >
-      {/* Subtle background ambient glow */}
-      <div
-        className="absolute -right-8 -bottom-8 w-24 h-24 rounded-full opacity-10 blur-xl pointer-events-none transition-all duration-500 group-hover:scale-150 group-hover:opacity-20"
-        style={{ background: gradient }}
-      />
-
-      <div className="flex items-start justify-between relative z-10">
-        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-        {Icon && (
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-            style={{ background: gradient }}
-          >
-            <Icon size={18} className={iconClass} />
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 relative z-10">
-        <div className="text-[28px] font-extrabold text-slate-900 tracking-tight leading-none">
-          {value}
-        </div>
-
-        {(trend !== undefined || trendLabel) && (
-          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-semibold">
-            {trend !== undefined && (
-              <span
-                className={clsx(
-                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold',
-                  isPositive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                )}
-              >
-                {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                {isPositive ? '+' : ''}{trend}%
-              </span>
-            )}
-            {trendLabel && <span className="text-slate-400 font-medium text-[11px]">{trendLabel}</span>}
-          </div>
-        )}
-      </div>
+    <div className={clsx('flex items-center justify-center flex-shrink-0', dims, TONES[tone] || TONES.brand, className)}>
+      {Icon && <Icon size={iconSize} />}
     </div>
   );
 }
 
-/* ─── Status Badge ───────────────────────────────────────────────── */
+/* ─── KPI Card ───────────────────────────────────────────────── */
+export function KPICard({ label, value, icon, tone = 'brand', hint }) {
+  return (
+    <div className="card p-5 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className="text-[26px] font-semibold text-slate-900 tracking-tight leading-tight mt-1.5 truncate">{value}</div>
+        {hint && <div className="text-xs text-slate-400 mt-1">{hint}</div>}
+      </div>
+      {icon && <IconChip icon={icon} tone={tone} />}
+    </div>
+  );
+}
+
+/* ─── Status Badge ───────────────────────────────────────────── */
 const STATUS_MAP = {
-  completed:   { dot: '#16A34A', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/60', label: 'Completed' },
-  cancelled:   { dot: '#EF4444', bg: 'bg-rose-50 text-rose-700 border-rose-200/60',       label: 'Cancelled' },
-  pending:     { dot: '#F59E0B', bg: 'bg-amber-50 text-amber-700 border-amber-200/60',     label: 'Pending' },
-  accepted:    { dot: '#2563EB', bg: 'bg-blue-50 text-blue-700 border-blue-200/60',         label: 'Accepted' },
-  in_progress: { dot: '#10B981', bg: 'bg-emerald-50 text-emerald-800 border-emerald-300',   label: 'In Progress', pulse: true },
-  online:      { dot: '#10B981', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',   label: 'Online', pulse: true },
-  offline:     { dot: '#94A3B8', bg: 'bg-slate-100 text-slate-600 border-slate-200',        label: 'Offline' },
-  active:      { dot: '#10B981', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',   label: 'Active' },
-  inactive:    { dot: '#94A3B8', bg: 'bg-slate-100 text-slate-600 border-slate-200',        label: 'Inactive' },
-  approved:    { dot: '#16A34A', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',   label: 'Approved' },
-  rejected:    { dot: '#EF4444', bg: 'bg-rose-50 text-rose-700 border-rose-200',           label: 'Rejected' },
+  completed:   { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#16A34A', label: 'Completed' },
+  cancelled:   { cls: 'bg-rose-50 text-rose-700 border-rose-200',          dot: '#DC2626', label: 'Cancelled' },
+  rejected:    { cls: 'bg-rose-50 text-rose-700 border-rose-200',          dot: '#DC2626', label: 'Rejected' },
+  pending:     { cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: '#D97706', label: 'Pending' },
+  accepted:    { cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: '#2563EB', label: 'Accepted' },
+  in_progress: { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#16A34A', label: 'In progress', live: true },
+  online:      { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#16A34A', label: 'Online', live: true },
+  offline:     { cls: 'bg-slate-100 text-slate-600 border-slate-200',      dot: '#94A3B8', label: 'Offline' },
+  active:      { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#16A34A', label: 'Active' },
+  inactive:    { cls: 'bg-slate-100 text-slate-600 border-slate-200',      dot: '#94A3B8', label: 'Inactive' },
+  blocked:     { cls: 'bg-rose-50 text-rose-700 border-rose-200',          dot: '#DC2626', label: 'Blocked' },
+  approved:    { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: '#16A34A', label: 'Approved' },
+  failed:      { cls: 'bg-rose-50 text-rose-700 border-rose-200',          dot: '#DC2626', label: 'Failed' },
+  refunded:    { cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: '#7C3AED', label: 'Refunded' },
 };
 
 export function StatusBadge({ status, className }) {
-  const normalized = status ? status.toLowerCase() : '';
-  const cfg = STATUS_MAP[normalized] || {
-    dot: '#94A3B8',
-    bg: 'bg-slate-100 text-slate-600 border-slate-200',
-    label: status || 'Unknown',
-  };
-
+  const key = status ? String(status).toLowerCase() : '';
+  const cfg = STATUS_MAP[key] || { cls: 'bg-slate-100 text-slate-600 border-slate-200', dot: '#94A3B8', label: status || 'Unknown' };
   return (
-    <span
-      className={clsx(
-        'badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border shadow-sm',
-        cfg.bg,
-        className
-      )}
-    >
-      <span className="relative flex h-2 w-2">
-        {cfg.pulse && (
-          <span
-            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-            style={{ backgroundColor: cfg.dot }}
-          />
-        )}
-        <span
-          className="relative inline-flex rounded-full h-2 w-2"
-          style={{ backgroundColor: cfg.dot }}
-        />
-      </span>
+    <span className={clsx('badge', cfg.cls, className)}>
+      <span className={clsx(cfg.live && 'live-dot')} style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, display: 'inline-block' }} />
       {cfg.label}
     </span>
   );
 }
 
-/* ─── Empty State ────────────────────────────────────────────────── */
-export function EmptyState({ icon: Icon, title, description, action }) {
+/* ─── Empty State ────────────────────────────────────────────── */
+export function EmptyState({ icon: Icon, title, description, action, compact = false }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-center px-4 animate-fade-in">
+    <div className={clsx('flex flex-col items-center justify-center text-center px-4', compact ? 'py-8' : 'py-14')}>
       {Icon && (
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-3 shadow-inner border border-slate-200/60">
-          <Icon size={28} className="text-slate-400" />
+        <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+          <Icon size={22} />
         </div>
       )}
-      <div className="text-base font-bold text-slate-900">{title}</div>
-      {description && <p className="text-sm text-slate-500 max-w-sm mt-1 leading-relaxed">{description}</p>}
+      <div className="text-sm font-semibold text-slate-900">{title}</div>
+      {description && <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-/* ─── Skeleton ───────────────────────────────────────────────────── */
+/* ─── Skeleton ───────────────────────────────────────────────── */
 export function Skeleton({ className }) {
-  return <div className={clsx('skeleton rounded-xl', className)} />;
+  return <div className={clsx('skeleton', className)} />;
 }
 
-export function SkeletonCard() {
+export function SkeletonRows({ rows = 3 }) {
   return (
-    <div className="card p-5 space-y-3">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-3 w-20" />
+    <div className="p-5 space-y-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4">
+          <Skeleton className="w-9 h-9 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-1/2" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ─── Toast ──────────────────────────────────────────────────────── */
-export function Toast({ message, type = 'success' }) {
-  if (!message) return null;
+export function SkeletonKPIs({ count = 4 }) {
+  return Array.from({ length: count }).map((_, i) => (
+    <div key={i} className="card p-5 space-y-3">
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-7 w-20" />
+    </div>
+  ));
+}
 
+/* ─── Toast ──────────────────────────────────────────────────── */
+export function useToast(duration = 3200) {
+  const [toast, setToast] = useState(null);
+  const timer = useRef(null);
+  const show = useCallback((message, type = 'success') => {
+    if (timer.current) clearTimeout(timer.current);
+    setToast({ message, type });
+    timer.current = setTimeout(() => setToast(null), duration);
+  }, [duration]);
+  useEffect(() => () => timer.current && clearTimeout(timer.current), []);
+  return [toast, show];
+}
+
+export function Toast({ toast }) {
+  if (!toast?.message) return null;
+  const { message, type = 'success' } = toast;
   const icons = {
     success: <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />,
     error:   <AlertCircle size={16} className="text-rose-400 flex-shrink-0" />,
     info:    <Info size={16} className="text-blue-400 flex-shrink-0" />,
   };
-
-  const borderColors = {
-    success: 'border-l-emerald-500',
-    error:   'border-l-rose-500',
-    info:    'border-l-blue-500',
-  };
-
   return (
-    <div className="fixed top-5 right-5 z-[100] animate-slide-in">
-      <div
-        className={clsx(
-          'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold shadow-2xl min-w-[280px] bg-slate-900 text-white border border-slate-800 border-l-4 backdrop-blur-md',
-          borderColors[type] || borderColors.success
-        )}
-      >
+    <div className="fixed top-4 right-4 z-[100] animate-slide-in" role="status">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium shadow-lg min-w-[260px] max-w-sm bg-slate-900 text-white">
         {icons[type] || icons.success}
         <span className="flex-1">{message}</span>
       </div>
@@ -175,12 +143,90 @@ export function Toast({ message, type = 'success' }) {
   );
 }
 
-/* ─── Section Header ─────────────────────────────────────────────── */
+/* ─── Inline alert ───────────────────────────────────────────── */
+export function Alert({ type = 'info', children, className }) {
+  const styles = {
+    info:    'bg-blue-50 border-blue-200 text-blue-800',
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    warning: 'bg-amber-50 border-amber-200 text-amber-800',
+    error:   'bg-rose-50 border-rose-200 text-rose-800',
+  };
+  const icons = { info: Info, success: CheckCircle2, warning: AlertCircle, error: AlertCircle };
+  const Icon = icons[type] || Info;
+  return (
+    <div className={clsx('flex items-start gap-2.5 px-4 py-3 rounded-xl border text-sm animate-fade-in', styles[type], className)}>
+      <Icon size={16} className="flex-shrink-0 mt-0.5" />
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+/* ─── Tabs ───────────────────────────────────────────────────── */
+export function Tabs({ tabs, value, onChange }) {
+  return (
+    <div className="tabs" role="tablist">
+      {tabs.map(({ id, label, icon: Icon, count }) => (
+        <button
+          key={id}
+          role="tab"
+          aria-selected={value === id}
+          onClick={() => onChange(id)}
+          className={clsx('tab', value === id && 'active')}
+        >
+          {Icon && <Icon size={14} />}
+          {label}
+          {count !== undefined && count !== null && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700 text-[10px] font-bold leading-none">
+              {count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Modal ──────────────────────────────────────────────────── */
+export function Modal({ open, title, description, onClose, children, footer, size = 'md' }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  const width = size === 'lg' ? 'max-w-2xl' : size === 'sm' ? 'max-w-sm' : 'max-w-md';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 animate-fade-in" onMouseDown={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className={clsx('card w-full p-6 shadow-xl animate-slide-in', width)}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+          </div>
+          <button onClick={onClose} className="btn-ghost btn-sm -mr-2 -mt-1" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+        {footer && <div className="flex justify-end gap-2 pt-5 mt-5 border-t border-slate-100">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Section Header ─────────────────────────────────────────── */
 export function SectionHeader({ title, description, action }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <div>
-        <h2 className="text-lg font-bold text-slate-900 tracking-tight">{title}</h2>
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
       </div>
       {action && <div>{action}</div>}
@@ -188,18 +234,28 @@ export function SectionHeader({ title, description, action }) {
   );
 }
 
-/* ─── Loading Spinner ────────────────────────────────────────────── */
-export function Spinner({ size = 20, className }) {
+/* ─── Spinner ────────────────────────────────────────────────── */
+export function Spinner({ size = 18, className }) {
   return (
-    <svg
-      className={clsx('animate-spin', className)}
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
+    <svg className={clsx('animate-spin', className)} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
     </svg>
+  );
+}
+
+/* ─── Route label (pickup → destination) ─────────────────────── */
+export function RouteLabel({ pickup, destination, className }) {
+  return (
+    <div className={clsx('min-w-0', className)}>
+      <div className="flex items-center gap-2 text-[13px] text-slate-900 font-medium">
+        <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+        <span className="truncate">{pickup || '—'}</span>
+      </div>
+      <div className="flex items-center gap-2 text-[13px] text-slate-600 mt-1">
+        <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0" />
+        <span className="truncate">{destination || '—'}</span>
+      </div>
+    </div>
   );
 }

@@ -106,7 +106,7 @@ module.exports = function passengerRoute(router) {
 
           // Count online, approved drivers.
           const [driverCount] = await pool.execute(`
-              SELECT COUNT(*) AS [count]
+              SELECT COUNT(*) AS driver_count
               FROM driver_profiles
               WHERE availability = 'online'
                 AND verification_status = 'approved'
@@ -118,7 +118,7 @@ module.exports = function passengerRoute(router) {
               destination: destination.trim(),
               estimated_km: estimatedKm,
               estimated_fare: fareOptions[0]?.estimated_fare || null,
-              availableDrivers: Number(driverCount[0].count),
+              availableDrivers: Number(driverCount[0]?.driver_count || 0),
               fareOptions
           });
       } catch (err) {
@@ -473,11 +473,12 @@ module.exports = function passengerRoute(router) {
       const [stats] = await pool.execute(
         `SELECT
            COUNT(*) AS total_rides,
-           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_rides,
-           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_rides,
-           COALESCE(SUM(CASE WHEN status = 'completed' THEN estimated_fare ELSE 0 END), 0) AS total_spent
-         FROM ride_requests
-         WHERE passenger_id = ?`,
+           SUM(CASE WHEN rr.status = 'completed' THEN 1 ELSE 0 END) AS completed_rides,
+           SUM(CASE WHEN rr.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_rides,
+           COALESCE(SUM(CASE WHEN t.trip_status = 'completed' THEN t.fare ELSE 0 END), 0) AS total_spent
+         FROM ride_requests rr
+         LEFT JOIN trips t ON t.request_id = rr.request_id
+         WHERE rr.passenger_id = ?`,
         [passengerId]
       );
 
@@ -510,10 +511,16 @@ module.exports = function passengerRoute(router) {
         [passengerId]
       );
 
+      const s = stats[0] || {};
       req.sendJSON(200, {
-        success:    true,
-        stats:      stats[0] || { total_rides: 0, completed_rides: 0, cancelled_rides: 0, total_spent: 0 },
-        activeRide: active.length > 0 ? active[0] : null,
+        success: true,
+        stats: {
+          total_rides:     parseInt(s.total_rides, 10) || 0,
+          completed_rides: parseInt(s.completed_rides, 10) || 0,
+          cancelled_rides: parseInt(s.cancelled_rides, 10) || 0,
+          total_spent:     parseFloat(s.total_spent) || 0,
+        },
+        activeRide:  active.length > 0 ? active[0] : null,
         recentRides: recent,
       });
     } catch (err) {

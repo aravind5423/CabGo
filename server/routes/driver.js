@@ -91,6 +91,17 @@ module.exports = function driverRoute(router) {
 
     try {
       const { driver } = await getDriverDetails(pool, guard.user.user_id);
+
+      if (availability === 'online' && driver.verification_status !== 'approved') {
+        return req.sendJSON(403, {
+          success: false,
+          message: driver.verification_status === 'rejected'
+            ? 'Your driver application was rejected. Contact support to appeal.'
+            : 'Your driver account is pending admin verification. You can go online once approved.',
+          verification_status: driver.verification_status,
+        });
+      }
+
       await pool.execute(
         `UPDATE driver_profiles SET availability = ? WHERE driver_id = ?`,
         [availability, driver.driver_id]
@@ -109,13 +120,8 @@ module.exports = function driverRoute(router) {
         availability,
       });
     } catch (err) {
-      console.warn('[driver/availability] DB error:', err.message);
-      // Fallback response for demo resilience
-      req.sendJSON(200, {
-        success:      true,
-        message:      `You are now ${availability} (demo mode).`,
-        availability,
-      });
+      console.error('[driver/availability]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to update availability.' });
     }
   });
 
@@ -135,7 +141,8 @@ module.exports = function driverRoute(router) {
            SUM(CASE WHEN trip_status = 'completed' THEN 1 ELSE 0 END) AS completed_trips,
            SUM(CASE WHEN trip_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_trips,
            COALESCE(SUM(CASE WHEN trip_status = 'completed' THEN fare ELSE 0 END), 0) AS total_earnings,
-           COALESCE(SUM(CASE WHEN trip_status = 'completed' AND DATE(start_time) = CURDATE() THEN fare ELSE 0 END), 0) AS today_earnings
+           COALESCE(SUM(CASE WHEN trip_status = 'completed' AND DATE(start_time) = CURDATE() THEN fare ELSE 0 END), 0) AS today_earnings,
+           SUM(CASE WHEN trip_status = 'completed' AND DATE(start_time) = CURDATE() THEN 1 ELSE 0 END) AS today_trips
          FROM trips
          WHERE driver_id = ?`,
         [driver.driver_id]
@@ -200,58 +207,20 @@ module.exports = function driverRoute(router) {
         },
         stats: {
           today_earnings:   parseFloat(statsRows[0]?.today_earnings || 0),
+          today_trips:      parseInt(statsRows[0]?.today_trips, 10) || 0,
           total_earnings:   parseFloat(statsRows[0]?.total_earnings || 0),
-          completed_trips:  statsRows[0]?.completed_trips || 0,
-          cancelled_trips:  statsRows[0]?.cancelled_trips || 0,
-          total_trips:      statsRows[0]?.total_trips || 0,
-          pending_requests: pendingCountRows[0]?.pending_count || 0,
+          completed_trips:  parseInt(statsRows[0]?.completed_trips, 10) || 0,
+          cancelled_trips:  parseInt(statsRows[0]?.cancelled_trips, 10) || 0,
+          total_trips:      parseInt(statsRows[0]?.total_trips, 10) || 0,
+          pending_requests: parseInt(pendingCountRows[0]?.pending_count, 10) || 0,
         },
         activeTrip:  activeTripRows.length > 0 ? activeTripRows[0] : null,
         recentTrips: recentTrips,
       });
 
     } catch (err) {
-      console.warn('[driver/dashboard] DB fallback mode:', err.message);
-      // Demo fallback response
-      req.sendJSON(200, {
-        success: true,
-        driver: {
-          driver_id:           1,
-          name:                guard.user.name || 'Driver Partner',
-          email:               guard.user.email,
-          license_no:          'TN-01-2022-004455',
-          verification_status: 'approved',
-          availability:        'online',
-          rating:              4.90,
-        },
-        vehicle: {
-          vehicle_number: 'TN-09-AB-1234',
-          vehicle_type:   'sedan',
-          model:          'Honda City (Pearl White)',
-          capacity:       4,
-        },
-        stats: {
-          today_earnings:   1280.00,
-          total_earnings:   18450.00,
-          completed_trips:  42,
-          cancelled_trips:  1,
-          total_trips:      43,
-          pending_requests: 3,
-        },
-        activeTrip: null,
-        recentTrips: [
-          {
-            trip_id:         101,
-            trip_status:     'completed',
-            start_time:      new Date(Date.now() - 3600000).toISOString(),
-            pickup_location: 'Anna Nagar Roundtana',
-            destination:     'T. Nagar Ranganathan St',
-            passenger_name:  'Aravind Passenger',
-            fare:            253.00,
-            distance_km:     8.5,
-          }
-        ],
-      });
+      console.error('[driver/dashboard]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to load driver dashboard.' });
     }
   });
 
@@ -289,37 +258,8 @@ module.exports = function driverRoute(router) {
       });
 
     } catch (err) {
-      console.warn('[driver/ride-requests] DB fallback mode:', err.message);
-      // Realistic fallback demo requests
-      req.sendJSON(200, {
-        success:      true,
-        availability: 'online',
-        vehicleType:  'sedan',
-        requests: [
-          {
-            request_id:      201,
-            pickup_location: 'Phoenix Market City, Velachery',
-            destination:     'Marina Beach Lighthouse',
-            vehicle_type:    'sedan',
-            estimated_fare:  280.00,
-            status:          'pending',
-            requested_at:    new Date(Date.now() - 120000).toISOString(),
-            passenger_name:  'Aravind Passenger',
-            passenger_mobile:'9876543220',
-          },
-          {
-            request_id:      202,
-            pickup_location: 'TIDEL Park, OMR',
-            destination:     'Chennai Central Railway Station',
-            vehicle_type:    'sedan',
-            estimated_fare:  340.00,
-            status:          'pending',
-            requested_at:    new Date(Date.now() - 300000).toISOString(),
-            passenger_name:  'Priya Mohan',
-            passenger_mobile:'9876543221',
-          }
-        ],
-      });
+      console.error('[driver/ride-requests]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to load ride requests.' });
     }
   });
 
@@ -340,11 +280,19 @@ module.exports = function driverRoute(router) {
 
       const { driver, vehicle } = await getDriverDetails(conn, guard.user.user_id);
 
+      if (driver.verification_status !== 'approved') {
+        await conn.rollback();
+        return req.sendJSON(403, {
+          success: false,
+          message: 'Your driver account must be verified by an admin before accepting rides.',
+        });
+      }
+
       if (driver.availability !== 'online') {
         await conn.rollback();
         return req.sendJSON(400, {
           success: false,
-          message: 'You must be ONLINE to accept ride requests.',
+          message: 'You must be online to accept ride requests.',
         });
       }
 
@@ -509,11 +457,8 @@ module.exports = function driverRoute(router) {
       });
 
     } catch (err) {
-      console.warn('[driver/active-trip] DB fallback:', err.message);
-      req.sendJSON(200, {
-        success: true,
-        trip: null,
-      });
+      console.error('[driver/active-trip]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to load active trip.' });
     }
   });
 
@@ -751,32 +696,8 @@ module.exports = function driverRoute(router) {
       });
 
     } catch (err) {
-      console.warn('[driver/earnings] DB fallback:', err.message);
-      req.sendJSON(200, {
-        success: true,
-        period,
-        summary: {
-          total_earnings: 12500.00,
-          total_trips:    35,
-          avg_fare:       357.14,
-          total_km:       240.5,
-        },
-        trips: [
-          {
-            trip_id:         1,
-            start_time:      new Date(Date.now() - 86400000).toISOString(),
-            end_time:        new Date(Date.now() - 83000000).toISOString(),
-            distance_km:     8.5,
-            fare:            253.00,
-            pickup_location: 'Anna Nagar Roundtana',
-            destination:     'T. Nagar Ranganathan St',
-            vehicle_type:    'sedan',
-            passenger_name:  'Aravind Passenger',
-            payment_method:  'wallet',
-            payment_status:  'completed',
-          }
-        ],
-      });
+      console.error('[driver/earnings]', err.message);
+      req.sendJSON(500, { success: false, message: 'Failed to load earnings.' });
     }
   });
 
@@ -878,7 +799,7 @@ module.exports = function driverRoute(router) {
         [driver.driver_id, cleanNumber, cleanType, cleanModel, parsedCapacity]
       );
 
-      await logAction(pool, guard.user.user_id, 'ADD_VEHICLE', `Registered vehicle ${cleanNumber}`, getClientIp(req));
+      await logAction({ userId: guard.user.user_id, action: 'ADD_VEHICLE', description: `Registered vehicle ${cleanNumber}`, ip: getClientIp(req) });
 
       return req.sendJSON(201, {
         success: true,
@@ -927,12 +848,20 @@ module.exports = function driverRoute(router) {
         : current.vehicle_type;
       const newStatus = status !== undefined && ['active', 'inactive'].includes(status) ? status : current.status;
 
+      // Only one vehicle can be active per driver (ride requests are matched on the active vehicle type).
+      if (newStatus === 'active' && current.status !== 'active') {
+        await pool.execute(
+          `UPDATE vehicles SET status = 'inactive' WHERE driver_id = ? AND vehicle_id <> ? AND status = 'active'`,
+          [driver.driver_id, vehicleId]
+        );
+      }
+
       await pool.execute(
         `UPDATE vehicles SET model = ?, capacity = ?, vehicle_type = ?, status = ? WHERE vehicle_id = ?`,
         [newModel, newCapacity, newType, newStatus, vehicleId]
       );
 
-      await logAction(pool, guard.user.user_id, 'UPDATE_VEHICLE', `Updated vehicle #${vehicleId}`, getClientIp(req));
+      await logAction({ userId: guard.user.user_id, action: 'UPDATE_VEHICLE', description: `Updated vehicle #${vehicleId}`, ip: getClientIp(req) });
 
       return req.sendJSON(200, {
         success: true,
@@ -977,12 +906,12 @@ module.exports = function driverRoute(router) {
       );
 
       if (trips.length > 0) {
-        await pool.execute('UPDATE vehicles SET status = "inactive" WHERE vehicle_id = ?', [vehicleId]);
-        await logAction(pool, guard.user.user_id, 'DEACTIVATE_VEHICLE', `Deactivated vehicle #${vehicleId} (has trip history)`, getClientIp(req));
+        await pool.execute("UPDATE vehicles SET status = 'inactive' WHERE vehicle_id = ?", [vehicleId]);
+        await logAction({ userId: guard.user.user_id, action: 'DEACTIVATE_VEHICLE', description: `Deactivated vehicle #${vehicleId} (has trip history)`, ip: getClientIp(req) });
         return req.sendJSON(200, { success: true, message: 'Vehicle has trip history and was marked inactive.' });
       } else {
         await pool.execute('DELETE FROM vehicles WHERE vehicle_id = ?', [vehicleId]);
-        await logAction(pool, guard.user.user_id, 'DELETE_VEHICLE', `Deleted vehicle #${vehicleId}`, getClientIp(req));
+        await logAction({ userId: guard.user.user_id, action: 'DELETE_VEHICLE', description: `Deleted vehicle #${vehicleId}`, ip: getClientIp(req) });
         return req.sendJSON(200, { success: true, message: 'Vehicle removed successfully.' });
       }
     } catch (err) {
