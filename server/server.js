@@ -1,15 +1,13 @@
 // server/server.js
-// Raw Node.js HTTP server — no Express or any web framework
-// Serves static files from /public and routes API calls
+// Express HTTP server with helmet, cors, rate limiting, Socket.IO, and static file serving.
+// Backwards-compatible: attaches req.sendJSON shim so all existing raw-HTTP route handlers
+// continue to work without modification.
 
 'use strict';
 
-const http = require('http');
+// ── Load .env before anything else ──────────────────────────
 const fs   = require('fs');
 const path = require('path');
-const url  = require('url');
-
-// ── Load .env before anything else ──────────────────────────
 const envPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envPath)) {
   const lines = fs.readFileSync(envPath, 'utf8').split('\n');
@@ -24,11 +22,15 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-// ── Middleware & Security ─────────────────────────────────────
+const express = require('express');
+const helmet  = require('helmet');
+const cors    = require('cors');
+const http    = require('http');
+
+// ── In-house middleware ──────────────────────────────────────
 const { checkRateLimit } = require('./middleware/rateLimit');
 
 // ── Route handlers ───────────────────────────────────────────
-const Router         = require('./router');
 const authRoute      = require('./routes/auth');
 const passengerRoute = require('./routes/passenger');
 const driverRoute    = require('./routes/driver');
@@ -38,6 +40,8 @@ const adminRoute     = require('./routes/admin');
 const superRoute     = require('./routes/superadmin');
 const streamRoute    = require('./routes/stream');
 
+// ── Custom router (unchanged — all routes still use this API) ─
+const Router = require('./router');
 const router = new Router();
 authRoute(router);
 passengerRoute(router);
@@ -48,29 +52,8 @@ adminRoute(router);
 superRoute(router);
 streamRoute(router);
 
-// ── MIME types ───────────────────────────────────────────────
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css':  'text/css; charset=utf-8',
-  '.js':   'application/javascript; charset=utf-8',
-  '.json': 'application/json',
-  '.png':  'image/png',
-  '.jpg':  'image/jpeg',
-  '.svg':  'image/svg+xml',
-  '.ico':  'image/x-icon',
-};
-
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const PORT       = process.env.SERVER_PORT || 5000;
-
-// ── Security Helper: resolve client IP ────────────────────────
-function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.socket?.remoteAddress || '127.0.0.1';
-}
+const PORT       = parseInt(process.env.SERVER_PORT, 10) || 5000;
 
 // ── Security Helper: recursive input sanitization ─────────────
 function sanitizeInput(obj) {
@@ -78,135 +61,126 @@ function sanitizeInput(obj) {
   if (typeof obj === 'string') {
     return obj.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   }
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeInput);
-  }
+  if (Array.isArray(obj)) return obj.map(sanitizeInput);
   if (typeof obj === 'object') {
     const clean = {};
-    for (const [key, val] of Object.entries(obj)) {
-      clean[key] = sanitizeInput(val);
-    }
+    for (const [key, val] of Object.entries(obj)) clean[key] = sanitizeInput(val);
     return clean;
   }
   return obj;
 }
 
-// ── Helper: send JSON with enhanced CORS & Security Headers ───
+// ── sendJSON helper (used by route files via req.sendJSON shim) ─
 function sendJSON(res, status, data, extraHeaders = {}) {
-  res.writeHead(status, {
-    'Content-Type':                 'application/json',
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-    'X-Content-Type-Options':       'nosniff',
-    'X-Frame-Options':              'DENY',
-    ...extraHeaders
+  // If Express res is already sent, skip
+  if (res.headersSent) return;
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options':        'DENY',
+    ...extraHeaders,
   });
-  res.end(JSON.stringify(data));
+  res.status(status).json(data);
 }
 
-// ── Helper: read body with sanitization ───────────────────────
+// ── Helper: read body (kept for module.exports compatibility) ──
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', chunk => { raw += chunk; });
-    req.on('end', () => {
-      try {
-        const parsed = raw ? JSON.parse(raw) : {};
-        resolve(sanitizeInput(parsed));
-      } catch {
-        reject(new Error('Invalid JSON body'));
-      }
-    });
-    req.on('error', reject);
-  });
+  // With Express json() middleware body is already on req.body
+  return Promise.resolve(req.body || {});
 }
 
-// ── Helper: serve static file ────────────────────────────────
-function serveStatic(res, filePath) {
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('404 Not Found');
-      return;
-    }
-    const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      'X-Content-Type-Options': 'nosniff'
+// ── Express App ──────────────────────────────────────────────
+const app = express();
+
+// Security headers via helmet (replaces manual header setting)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false, // Allow inline scripts in existing HTML pages
+}));
+
+// CORS — allow all origins (matching original behaviour)
+app.use(cors({
+  origin:  '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+
+// Parse JSON bodies; sanitize after parsing
+app.use(express.json({ limit: '1mb' }));
+app.use((req, _res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitizeInput(req.body);
+  }
+  next();
+});
+
+// ── req.sendJSON shim ─────────────────────────────────────────
+// All existing route handlers call req.sendJSON(status, data).
+// This middleware attaches it so routes need zero changes.
+app.use((req, res, next) => {
+  req.sendJSON = (status, data, extraHeaders) => sendJSON(res, status, data, extraHeaders);
+  next();
+});
+
+// ── In-memory rate limiter (preserved from original) ─────────
+app.use('/api', (req, res, next) => {
+  const isSSE = req.path.startsWith('/stream/');
+  if (isSSE) return next(); // SSE connections bypass rate limiting
+
+  const clientIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  const rateCheck = checkRateLimit(clientIp, req.path);
+  if (!rateCheck.allowed) {
+    const retryAfterSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000));
+    res.set({
+      'Retry-After':        String(retryAfterSec),
+      'X-RateLimit-Limit':  String(rateCheck.limit),
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset':  String(Math.ceil(rateCheck.resetTime / 1000)),
     });
-    res.end(data);
-  });
-}
+    return res.status(429).json({
+      success: false,
+      message: 'Too many requests. Rate limit exceeded, please try again shortly.',
+    });
+  }
+  next();
+});
+
+// ── API routes (custom Router adaptor) ───────────────────────
+// The custom Router stores routes as {method, regex, keys, handler}.
+// We delegate matching to it so all route files stay unchanged.
+app.use('/api', async (req, res, next) => {
+  // Patch req.url so custom Router sees the full /api/... path
+  const fullReq = { ...req, url: '/api' + req.path, method: req.method, headers: req.headers };
+  // We need the real req to stay patched, so mutate req.url temporarily
+  const origUrl = req.url;
+  req.url = '/api' + req.path;
+
+  const match = router.match(req);
+  req.url = origUrl; // restore
+
+  if (!match) return next(); // let Express handle 404 below
+
+  try {
+    await match.handler(req, res);
+  } catch (err) {
+    console.error('[server] API error:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+});
+
+// ── 404 for unmatched /api/* ──────────────────────────────────
+app.use('/api/*', (_req, res) => {
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
+});
+
+// ── Static files (/public) ────────────────────────────────────
+// Serve index.html for bare "/" and extension-less paths (SPA-friendly)
+app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
+app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 // ── HTTP Server ──────────────────────────────────────────────
-const server = http.createServer(async (req, res) => {
-  const parsed   = url.parse(req.url, true);
-  const pathname = parsed.pathname;
-
-  // ── CORS preflight ──
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Max-Age':       '86400',
-    });
-    res.end();
-    return;
-  }
-
-  // ── API routes ──
-  if (pathname.startsWith('/api/')) {
-    // 1. In-memory IP rate limiting (bypass for persistent SSE streams)
-    const clientIp = getClientIp(req);
-    const isSSE = pathname.startsWith('/api/stream/');
-    const rateCheck = isSSE ? { allowed: true } : checkRateLimit(clientIp, pathname);
-
-    if (!rateCheck.allowed) {
-      const retryAfterSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000));
-      sendJSON(res, 429, {
-        success: false,
-        message: 'Too many requests. Rate limit exceeded, please try again shortly.'
-      }, {
-        'Retry-After': String(retryAfterSec),
-        'X-RateLimit-Limit': String(rateCheck.limit),
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': String(Math.ceil(rateCheck.resetTime / 1000))
-      });
-      return;
-    }
-
-    const match = router.match(req);
-    if (!match) {
-      sendJSON(res, 404, { success: false, message: 'API endpoint not found' });
-      return;
-    }
-    try {
-      req.body     = await readBody(req);
-      req.sendJSON = (status, data, extraHeaders) => sendJSON(res, status, data, extraHeaders);
-      await match.handler(req, res);
-    } catch (err) {
-      console.error('[server] API error:', err.message);
-      sendJSON(res, 500, { success: false, message: 'Internal server error' });
-    }
-    return;
-  }
-
-  // ── Static files ──
-  let filePath = pathname === '/' ? '/index.html' : pathname;
-  // Prevent directory traversal
-  filePath = path.normalize(path.join(PUBLIC_DIR, filePath));
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403); res.end('Forbidden');
-    return;
-  }
-
-  // If no extension → try .html
-  if (!path.extname(filePath)) filePath += '.html';
-
-  serveStatic(res, filePath);
-});
+const server = http.createServer(app);
 
 // ── Socket.IO Real-Time Engine Integration ────────────────────
 let io = null;
