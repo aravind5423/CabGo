@@ -1,7 +1,7 @@
 {
   "name": "online-cab-booking",
   "version": "1.0.0",
-  "description": "Online Cab Booking System – Web Technology CIA Assignment",
+  "description": "CabGo – Modern Multi-Tenant Urban Transit & Dispatch Platform",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
@@ -32,22 +32,17 @@
   "keywords": [
     "cab",
     "booking",
+    "react",
+    "express",
+    "socket.io",
     "nodejs",
     "mysql"
   ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/bcryptjs": "^3.0.0",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.6.6",
-    "@types/supertest": "^7.2.1",
     "concurrently": "^10.0.6",
     "supertest": "^7.3.1",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
 }
