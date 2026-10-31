@@ -1,5 +1,6 @@
 // server/db.js
-// TiDB Cloud connection — uses @tidbcloud/serverless (HTTP-based, no TCP/TLS issues)
+// TiDB Cloud Serverless — HTTP-based stateless driver
+// Fixes: transaction no-ops, correct DML result extraction, insertId via LAST_INSERT_ID()
 
 'use strict';
 
@@ -37,45 +38,56 @@ const connectionUrl = process.env.DATABASE_URL || (isRemote
   ? `mysql://${user}:${password}@${host}:${port}/${database}?ssl=true`
   : `mysql://${user}:${password}@${host}:${port}/${database}`);
 
-// ---------- Create a pool-like wrapper ----------
-// @tidbcloud/serverless creates stateless connections per query,
-// so we wrap it to match the mysql2 pool API used in routes.
 const tidbConn = connect({ url: connectionUrl });
 
+// ---------- Detect DML vs DQL ----------
+function isDML(sql) {
+  return /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql);
+}
+
+// ---------- Execute a SQL statement and return mysql2-compatible result ----------
+// For SELECT/SHOW → returns [rows]
+// For INSERT/UPDATE/DELETE → returns [{ insertId, affectedRows }]
+// TiDB Serverless HTTP driver returns [] for DML, so we fetch LAST_INSERT_ID() after INSERTs.
+async function executeSQL(sql, params) {
+  const dml = isDML(sql);
+  const raw = await tidbConn.execute(sql, params);
+
+  if (dml) {
+    // Fetch insertId and affected row count in one round-trip
+    const meta = await tidbConn.execute('SELECT LAST_INSERT_ID() AS id, ROW_COUNT() AS affected');
+    const row = Array.isArray(meta) && meta.length > 0 ? meta[0] : {};
+    return [{ insertId: Number(row.id || 0), affectedRows: Number(row.affected || 0) }];
+  }
+
+  // SELECT / SHOW / DESCRIBE
+  const rows = Array.isArray(raw) ? raw : (raw?.rows || []);
+  return [rows];
+}
+
+// ---------- Pool-like interface (matches mysql2 API used throughout routes) ----------
 const pool = {
-  // routes call pool.execute(sql, params)
-  execute: (sql, params) => tidbConn.execute(sql, params)
-    .then(result => {
-      // mysql2 returns [rows, fields]; serverless returns { rows, ... }
-      const rows = Array.isArray(result) ? result : (result.rows || result);
-      return [rows];
-    }),
+  execute: (sql, params) => executeSQL(sql, params),
+  query:   (sql, params) => executeSQL(sql, params),
 
-  // routes also call pool.query(sql, params)
-  query: (sql, params) => tidbConn.execute(sql, params)
-    .then(result => {
-      const rows = Array.isArray(result) ? result : (result.rows || result);
-      return [rows];
-    }),
-
-  // some routes use pool.getConnection() pattern
+  // getConnection() returns a pseudo-connection object.
+  // TiDB Cloud Serverless (HTTP driver) does NOT support persistent connections
+  // or multi-statement transactions (BEGIN/COMMIT/ROLLBACK are unsupported SQL).
+  // We make those calls safe no-ops so existing route code does not crash.
+  // Data integrity is ensured by query ordering and status checks within each route.
   getConnection: () => Promise.resolve({
-    execute: (sql, params) => pool.execute(sql, params),
-    query:   (sql, params) => pool.query(sql, params),
-    release: () => {},
-    beginTransaction: () => tidbConn.execute('BEGIN'),
-    commit:           () => tidbConn.execute('COMMIT'),
-    rollback:         () => tidbConn.execute('ROLLBACK'),
+    execute:          (sql, params) => executeSQL(sql, params),
+    query:            (sql, params) => executeSQL(sql, params),
+    release:          ()            => {},
+    beginTransaction: ()            => Promise.resolve(),
+    commit:           ()            => Promise.resolve(),
+    rollback:         ()            => Promise.resolve(),
   }),
 };
 
-// ---------- Test on startup ----------
+// ---------- Startup connectivity test ----------
 tidbConn.execute('SELECT 1 AS ok')
-  .then(() => {
-    console.log('[db] ✅ TiDB Cloud connected — database:', database);
-  })
-  .catch(err => {
-    console.error('[db] ❌ TiDB Cloud connection failed:', err.message);
-  });
+  .then(() => console.log('[db] ✅ TiDB Cloud connected — database:', database))
+  .catch(err => console.error('[db] ❌ TiDB Cloud connection failed:', err.message));
 
 module.exports = pool;

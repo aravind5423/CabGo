@@ -105,7 +105,12 @@ module.exports = function ratingsRoute(router) {
         );
       }
 
-      await logAction(pool, currentUserId, 'SUBMIT_RATING', `Trip #${tripId} rated ${starRating} stars`, getClientIp(req));
+      await logAction({
+        userId:      currentUserId,
+        action:      'SUBMIT_RATING',
+        description: `Trip #${tripId} rated ${starRating} stars`,
+        ip:          getClientIp(req),
+      });
 
       return req.sendJSON(201, {
         success: true,

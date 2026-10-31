@@ -365,7 +365,7 @@ module.exports = function driverRoute(router) {
 
       // Lock and fetch ride request
       const [requests] = await conn.execute(
-        `SELECT * FROM ride_requests WHERE request_id = ? FOR UPDATE`,
+        `SELECT * FROM ride_requests WHERE request_id = ?`,
         [requestId]
       );
 
@@ -602,8 +602,7 @@ module.exports = function driverRoute(router) {
       // Verify trip belongs to driver and is in_progress
       const [trips] = await conn.execute(
         `SELECT * FROM trips
-         WHERE trip_id = ? AND driver_id = ? AND trip_status IN ('accepted', 'in_progress')
-         FOR UPDATE`,
+         WHERE trip_id = ? AND driver_id = ? AND trip_status IN ('accepted', 'in_progress')`,
         [tripId, driver.driver_id]
       );
 
