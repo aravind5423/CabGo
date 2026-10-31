@@ -79,7 +79,9 @@ module.exports = function driverRoute(router) {
     const guard = requireRole(['driver'])(req);
     if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
 
-    const { availability } = req.body;
+    let { availability, is_available } = req.body;
+    if (availability === undefined && is_available !== undefined) availability = is_available ? 'online' : 'offline';
+    if (typeof availability === 'boolean') availability = availability ? 'online' : 'offline';
     if (!['online', 'offline'].includes(availability)) {
       return req.sendJSON(400, {
         success: false,
