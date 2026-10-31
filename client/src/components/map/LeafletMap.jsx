@@ -3,14 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix Leaflet default icon asset paths for Vite bundler
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
 // Known Chennai Landmark Waypoint Geocoding Dictionary
 const CHENNAI_WAYPOINTS = {
   'chennai central': [13.0827, 80.2707],
@@ -65,24 +57,52 @@ export function resolveLatLng(input) {
   return null;
 }
 
-// Custom Marker Icons
-const pickupIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+// Custom Marker Icons (Zero external image dependencies, Retina-ready)
+const createPickupDivIcon = () =>
+  L.divIcon({
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #10B981;
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 0 14px rgba(16, 185, 129, 0.8), 0 3px 8px rgba(0,0,0,0.5);
+      ">
+        <span style="font-size: 15px; line-height: 1;">📍</span>
+      </div>
+    `,
+    className: 'cabgo-pickup-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
+  });
 
-const dropIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+const createDropDivIcon = () =>
+  L.divIcon({
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #EF4444;
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 0 14px rgba(239, 68, 68, 0.8), 0 3px 8px rgba(0,0,0,0.5);
+      ">
+        <span style="font-size: 15px; line-height: 1;">🏁</span>
+      </div>
+    `,
+    className: 'cabgo-drop-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
+  });
 
 // Custom Car Marker with animated glow & bearing rotation
 const createCarDivIcon = (bearing = 0) =>
@@ -95,9 +115,9 @@ const createCarDivIcon = (bearing = 0) =>
         width: 38px;
         height: 38px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(245,158,11,0.95) 0%, rgba(217,119,6,0.85) 100%);
-        border: 2px solid #ffffff;
-        box-shadow: 0 0 15px rgba(245, 158, 11, 0.9), 0 2px 6px rgba(0,0,0,0.5);
+        background: radial-gradient(circle, rgba(245,158,11,0.98) 0%, rgba(217,119,6,0.9) 100%);
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 0 18px rgba(245, 158, 11, 0.95), 0 3px 8px rgba(0,0,0,0.6);
         transform: rotate(${bearing}deg);
         transition: transform 0.4s ease;
       ">
@@ -126,8 +146,8 @@ function AutoFitBounds({ points }) {
 
 /**
  * LeafletMap Component
- * - Real OpenStreetMap GIS tiles
- * - Pickup (Green), Destination (Red), and Driver (Animated 🚖) markers
+ * - Uses CartoDB Voyager public CDN tiles (reliable, free, complies with web app tile usage policies)
+ * - Self-contained SVG/HTML markers for Pickup (Green), Destination (Red), and Driver (🚖 with bearing)
  * - Connecting Route Polyline
  * - Dynamic bounds auto-fit
  */
@@ -138,6 +158,7 @@ export default function LeafletMap({
   bearing = 0,
   height = '100%',
   zoom = 13,
+  theme = 'voyager', // 'voyager' | 'dark'
 }) {
   const pCoords = resolveLatLng(pickupCoords);
   const dCoords = resolveLatLng(dropCoords);
@@ -149,12 +170,16 @@ export default function LeafletMap({
   const polylinePoints = [];
   if (pCoords) polylinePoints.push(pCoords);
   if (vCoords && pCoords && dCoords) {
-    // Driver position between pickup & drop if in progress
     polylinePoints.push(vCoords);
   }
   if (dCoords) polylinePoints.push(dCoords);
 
   const allPoints = [pCoords, dCoords, vCoords].filter(Boolean);
+
+  const tileUrl =
+    theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
   return (
     <div style={{ height, width: '100%', minHeight: '260px' }}>
@@ -165,15 +190,17 @@ export default function LeafletMap({
         style={{ height: '100%', width: '100%', borderRadius: '16px' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>'
+          url={tileUrl}
+          subdomains="abcd"
+          maxZoom={20}
         />
 
         {allPoints.length > 0 && <AutoFitBounds points={allPoints} />}
 
         {/* Pickup Pin */}
         {pCoords && (
-          <Marker position={pCoords} icon={pickupIcon}>
+          <Marker position={pCoords} icon={createPickupDivIcon()}>
             <Popup>
               <div className="font-sans text-xs">
                 <span className="font-bold text-emerald-700 block">📍 Pickup Location</span>
@@ -185,7 +212,7 @@ export default function LeafletMap({
 
         {/* Destination Pin */}
         {dCoords && (
-          <Marker position={dCoords} icon={dropIcon}>
+          <Marker position={dCoords} icon={createDropDivIcon()}>
             <Popup>
               <div className="font-sans text-xs">
                 <span className="font-bold text-red-700 block">🏁 Destination</span>
@@ -214,7 +241,7 @@ export default function LeafletMap({
             pathOptions={{
               color: '#F59E0B',
               weight: 4,
-              opacity: 0.85,
+              opacity: 0.9,
               dashArray: '8, 8',
               lineCap: 'round',
             }}
