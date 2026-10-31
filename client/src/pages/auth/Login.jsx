@@ -2,42 +2,48 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
+import { Zap, Eye, EyeOff, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
+
+const QUICK_LOGINS = [
+  { label: 'Super Admin', email: 'superadmin', password: 'password123', color: 'text-error bg-error-bg border-error/20' },
+  { label: 'Ops Admin',   email: 'admin1',     password: 'password123', color: 'text-warning bg-warning-bg border-warning/20' },
+  { label: 'Driver',      email: 'driver1',    password: 'password123', color: 'text-success bg-success-bg border-success/20' },
+  { label: 'Passenger',   email: 'passenger1', password: 'password123', color: 'text-info bg-info-bg border-info/20' },
+];
 
 export default function Login() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
 
-  const [tab, setTab] = useState('login'); // 'login' | 'register'
+  const [tab, setTab] = useState('login');
+  const [showPw, setShowPw] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', mobile: '', role: 'passenger' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const ROLE_PATHS = {
+    passenger: '/passenger/dashboard',
+    driver: '/driver/dashboard',
+    admin: '/admin/dashboard',
+    superadmin: '/superadmin/dashboard',
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleLogin = async (e, customCreds = null) => {
-    if (e && e.preventDefault) e.preventDefault();
+  const handleLogin = async (e, creds = null) => {
+    if (e?.preventDefault) e.preventDefault();
     setLoading(true);
     setError('');
-    const targetEmail = customCreds ? customCreds.email : form.email;
-    const targetPassword = customCreds ? customCreds.password : form.password;
-
+    const email = creds?.email ?? form.email;
+    const password = creds?.password ?? form.password;
     try {
-      const { data } = await api.post('/auth/login', {
-        email: targetEmail,
-        password: targetPassword,
-      });
+      const { data } = await api.post('/auth/login', { email, password });
       login(data.token, data.user);
-      const paths = {
-        passenger: '/passenger/dashboard',
-        driver: '/driver/dashboard',
-        admin: '/admin/dashboard',
-        superadmin: '/superadmin/dashboard',
-      };
-      navigate(paths[data.user.role] || '/login');
+      navigate(ROLE_PATHS[data.user.role] || '/login');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -46,7 +52,7 @@ export default function Login() {
   };
 
   const fillAndLogin = (email, password) => {
-    setForm((prev) => ({ ...prev, email, password }));
+    setForm((p) => ({ ...p, email, password }));
     setError('');
     handleLogin(null, { email, password });
   };
@@ -67,46 +73,42 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[hsl(220,15%,10%)] px-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+      <div className="w-full max-w-[400px] animate-fade-in">
+
+        {/* Logo */}
         <div className="text-center mb-8">
-          <span className="text-5xl">🚖</span>
-          <h1 className="text-3xl font-bold mt-2 text-white font-['Outfit']">CabGo</h1>
-          <p className="text-[hsl(220,10%,60%)] mt-1">Your urban transit platform</p>
+          <div className="w-14 h-14 rounded-2xl bg-brand flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <Zap size={26} className="text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-ink">CabGo</h1>
+          <p className="text-sm text-ink-muted mt-1">Urban Transit Platform</p>
         </div>
 
         {/* Card */}
-        <div
-          className="rounded-2xl p-8"
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid hsl(220,15%,24%)',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-          }}
-        >
+        <div className="card p-7">
+
           {/* Tabs */}
-          <div className="flex rounded-xl overflow-hidden mb-6 bg-[hsl(220,15%,10%)]">
+          <div className="flex rounded-xl overflow-hidden bg-canvas border border-line mb-6 p-1 gap-1">
             {['login', 'register'].map((t) => (
               <button
                 key={t}
                 onClick={() => { setTab(t); setError(''); }}
                 className={clsx(
-                  'flex-1 py-2.5 text-sm font-semibold transition-colors capitalize',
+                  'flex-1 py-2 text-sm font-semibold rounded-lg transition capitalize',
                   tab === t
-                    ? 'bg-[hsl(38,95%,55%)] text-[hsl(220,15%,10%)]'
-                    : 'text-[hsl(220,10%,60%)] hover:text-white'
+                    ? 'bg-white text-ink shadow-sm'
+                    : 'text-ink-muted hover:text-ink'
                 )}
               >
-                {t}
+                {t === 'login' ? 'Sign In' : 'Register'}
               </button>
             ))}
           </div>
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
+            <div className="mb-5 px-4 py-3 rounded-xl bg-error-bg border border-error/20 text-error text-sm">
               {error}
             </div>
           )}
@@ -115,71 +117,61 @@ export default function Login() {
           {tab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Email or Username</label>
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Email or Username</label>
                 <input
                   type="text"
                   name="email"
                   value={form.email}
                   onChange={handleChange}
                   required
-                  placeholder="e.g. superadmin, driver1, or user@cab.com"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
+                  placeholder="you@example.com"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  required
-                  placeholder="••••••••"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
-                />
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    required
+                    placeholder="Min. 8 characters"
+                    className="input-field pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink-muted transition"
+                  >
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-[hsl(38,95%,55%)] text-[hsl(220,15%,10%)] font-bold hover:brightness-110 transition disabled:opacity-50"
-              >
+
+              <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
 
-              {/* Quick Demo Logins */}
-              <div className="mt-6 pt-5 border-t border-[hsl(220,15%,20%)]">
-                <p className="text-xs text-[hsl(220,10%,50%)] text-center mb-3 font-semibold uppercase tracking-wider">
-                  Quick Demo Login (1-Click Fill &amp; Sign In)
-                </p>
+              {/* Quick Login */}
+              <div className="mt-5 pt-5 border-t border-line">
+                <p className="text-xs text-ink-muted mb-3 text-center font-medium">Quick Demo Access</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fillAndLogin('superadmin', 'password123')}
-                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-amber-400 font-medium border border-amber-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>👑</span> Super Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillAndLogin('admin', 'password123')}
-                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-blue-400 font-medium border border-blue-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>🛡️</span> Ops Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillAndLogin('driver1', 'password123')}
-                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-emerald-400 font-medium border border-emerald-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>🚗</span> Driver
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillAndLogin('passenger1', 'password123')}
-                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-cyan-400 font-medium border border-cyan-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>🎒</span> Passenger
-                  </button>
+                  {QUICK_LOGINS.map(({ label, email, password, color }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => fillAndLogin(email, password)}
+                      className={clsx(
+                        'text-xs py-2 px-3 rounded-lg font-semibold border transition text-left cursor-pointer',
+                        color
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </form>
@@ -189,7 +181,7 @@ export default function Login() {
           {tab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Full Name</label>
                 <input
                   type="text"
                   name="name"
@@ -197,11 +189,11 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   placeholder="Your Name"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Email</label>
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Email</label>
                 <input
                   type="email"
                   name="email"
@@ -209,55 +201,63 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   placeholder="you@example.com"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Mobile</label>
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Mobile</label>
                 <input
                   type="tel"
                   name="mobile"
                   value={form.mobile}
                   onChange={handleChange}
                   required
-                  placeholder="+91 9876543210"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
+                  placeholder="+91 98765 43210"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  required
-                  placeholder="Min. 8 characters"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
-                />
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    required
+                    placeholder="Min. 8 characters"
+                    className="input-field pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink-muted transition"
+                  >
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">I am a</label>
+                <label className="block text-xs font-semibold text-ink-muted mb-1.5">I am a</label>
                 <select
                   name="role"
                   value={form.role}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
+                  className="input-field"
                 >
                   <option value="passenger">Passenger</option>
                   <option value="driver">Driver</option>
                 </select>
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-[hsl(38,95%,55%)] text-[hsl(220,15%,10%)] font-bold hover:brightness-110 transition disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
                 {loading ? 'Creating account…' : 'Create Account'}
               </button>
             </form>
           )}
         </div>
+
+        <p className="text-center text-xs text-ink-faint mt-6">© 2025 CabGo. All rights reserved.</p>
       </div>
     </div>
   );

@@ -1,13 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
-import {
-  DollarSign, TrendingUp, Clock, Star, ArrowLeft, Navigation, Award, Calendar, CheckCircle
-} from 'lucide-react';
+import { DollarSign, Navigation, Star, CheckCircle, Clock, MapPin } from 'lucide-react';
+import AppShell from '../../components/ui/AppShell';
+import { KPICard, EmptyState, Skeleton, StatusBadge } from '../../components/ui/UIKit';
 
 export default function DriverEarnings() {
-  const navigate = useNavigate();
-
   const { data, isLoading } = useQuery({
     queryKey: ['driverEarnings'],
     queryFn: () => api.get('/driver/earnings').then((r) => r.data),
@@ -20,131 +17,151 @@ export default function DriverEarnings() {
   const avgRating = earnings.avg_rating || '5.0';
 
   return (
-    <div className="min-h-screen bg-[hsl(220,15%,10%)] pb-12">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[hsl(220,15%,24%)] bg-[hsl(220,15%,10%)]/95 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/driver/dashboard"
-            className="flex items-center gap-2 text-[hsl(220,10%,60%)] hover:text-white transition"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-sm font-semibold">Console</span>
-          </Link>
-          <span className="text-gray-600">|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🚖</span>
-            <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
-            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-500/30">
-              Financial Earnings
-            </span>
-          </div>
-        </div>
-      </nav>
+    <AppShell title="Earnings" subtitle="Your trip fare disbursements and performance analytics">
+      <div className="space-y-5 animate-fade-in">
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-white font-['Outfit']">Driver Earnings Breakdown</h1>
-          <p className="text-sm text-[hsl(220,10%,60%)] mt-1">Direct payout analytics, trip fare disbursements, and ratings</p>
-        </div>
-
-        {/* Stat Cards */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-5 rounded-2xl bg-[hsl(220,15%,14%)] border border-amber-500/30 shadow-lg">
-            <div className="flex items-center justify-between text-xs text-[hsl(220,10%,60%)] mb-2">
-              <span className="font-bold uppercase tracking-wider text-amber-400">Total Net Payout</span>
-              <DollarSign size={18} className="text-amber-400" />
-            </div>
-            <div className="text-3xl font-extrabold text-white">
-              ₹{isLoading ? '…' : Number(totalEarnings).toFixed(2)}
-            </div>
-            <div className="text-xs text-emerald-400 mt-2 flex items-center gap-1 font-medium">
-              <CheckCircle size={13} /> Direct 100% daily settlement
-            </div>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[hsl(220,15%,14%)] border border-blue-500/30 shadow-lg">
-            <div className="flex items-center justify-between text-xs text-[hsl(220,10%,60%)] mb-2">
-              <span className="font-bold uppercase tracking-wider text-blue-400">Fulfilled Trips</span>
-              <Navigation size={18} className="text-blue-400" />
-            </div>
-            <div className="text-3xl font-extrabold text-white">
-              {isLoading ? '…' : tripCount}
-            </div>
-            <div className="text-xs text-[hsl(220,10%,50%)] mt-2">
-              Zero trip cancellation deductions
-            </div>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[hsl(220,15%,14%)] border border-yellow-500/30 shadow-lg">
-            <div className="flex items-center justify-between text-xs text-[hsl(220,10%,60%)] mb-2">
-              <span className="font-bold uppercase tracking-wider text-yellow-400">Service Rating</span>
-              <Star size={18} className="text-yellow-400 fill-yellow-400" />
-            </div>
-            <div className="text-3xl font-extrabold text-white">
-              {isLoading ? '…' : avgRating}
-            </div>
-            <div className="text-xs text-amber-300 mt-2 font-medium">
-              Top 5% Partner in Chennai Metro
-            </div>
-          </div>
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card-sm p-5 space-y-3">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            ))
+          ) : (
+            <>
+              <KPICard
+                label="Total Net Payout"
+                value={`₹${Number(totalEarnings).toFixed(2)}`}
+                icon={DollarSign}
+                iconClass="text-brand"
+                accentBg
+                trendLabel="100% direct settlement"
+              />
+              <KPICard
+                label="Fulfilled Trips"
+                value={tripCount}
+                icon={Navigation}
+                iconClass="text-info"
+                trendLabel="Zero cancellation deductions"
+              />
+              <KPICard
+                label="Service Rating"
+                value={avgRating}
+                icon={Star}
+                iconClass="text-warning"
+                trendLabel="Top 5% partner rating"
+              />
+            </>
+          )}
         </div>
 
-        {/* Trips Statement */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white">Per-Trip Fare Receipts</h2>
+        {/* Trips Statement Table */}
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-line flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">Per-Trip Fare Receipts</h2>
+              <p className="text-xs text-ink-muted mt-0.5">{trips.length} completed trips</p>
+            </div>
+          </div>
 
           {isLoading ? (
-            <div className="space-y-3">
+            <div className="p-5 space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 rounded-2xl bg-[hsl(220,15%,16%)] animate-pulse" />
-              ))}
-            </div>
-          ) : trips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-[hsl(220,15%,24%)] rounded-2xl bg-[hsl(220,15%,12%)]">
-              <DollarSign size={40} className="text-[hsl(220,10%,40%)] mb-3" />
-              <h3 className="text-base font-bold text-white">No Trips Settled Yet</h3>
-              <p className="text-xs text-[hsl(220,10%,50%)] mt-1">
-                Completed passenger rides will appear here with detailed fare accounting.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {trips.map((trip, idx) => (
-                <div
-                  key={trip.trip_id || idx}
-                  className="p-4 sm:p-5 rounded-2xl border border-[hsl(220,15%,22%)] bg-[hsl(220,15%,14%)] flex items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <div className="text-white text-sm font-semibold truncate">
-                      {trip.pickup_location} → {trip.destination}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-[hsl(220,10%,50%)] mt-1">
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {trip.end_time ? new Date(trip.end_time).toLocaleString() : 'Settled'}
-                      </span>
-                      {trip.passenger_name && (
-                        <span>Passenger: <strong className="text-gray-300">{trip.passenger_name}</strong></span>
-                      )}
-                      {trip.distance_km && <span>{trip.distance_km} km</span>}
-                    </div>
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-28" />
                   </div>
-
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-lg font-extrabold text-emerald-400">
-                      +₹{trip.fare || '—'}
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-500/30">
-                      Paid
-                    </span>
-                  </div>
+                  <Skeleton className="h-6 w-16" />
                 </div>
               ))}
             </div>
+          ) : trips.length === 0 ? (
+            <EmptyState
+              icon={DollarSign}
+              title="No earnings recorded"
+              description="Complete trips to see your fare receipts here."
+            />
+          ) : (
+            <>
+              {/* Desktop */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Trip</th>
+                      <th>Route</th>
+                      <th>Passenger</th>
+                      <th>Distance</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th className="text-right">Fare</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trips.map((trip) => (
+                      <tr key={trip.trip_id}>
+                        <td>
+                          <span className="font-mono text-xs text-ink-muted">#{trip.trip_id}</span>
+                        </td>
+                        <td>
+                          <div className="text-sm font-medium text-ink max-w-[200px] truncate">
+                            {trip.pickup_location} → {trip.destination}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-canvas flex items-center justify-center font-semibold text-xs text-ink flex-shrink-0">
+                              {trip.passenger_name?.[0]?.toUpperCase() || 'P'}
+                            </div>
+                            <span className="text-sm text-ink">{trip.passenger_name || '—'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="text-sm text-ink-muted">{trip.distance_km || '—'} km</span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+                            <Clock size={12} />
+                            {trip.start_time || trip.created_at || '—'}
+                          </div>
+                        </td>
+                        <td><StatusBadge status={trip.trip_status || 'completed'} /></td>
+                        <td className="text-right">
+                          <span className="text-sm font-bold text-success">+₹{trip.fare}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile */}
+              <div className="sm:hidden divide-y divide-[#F3F4F6]">
+                {trips.map((trip) => (
+                  <div key={trip.trip_id} className="px-4 py-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-canvas flex items-center justify-center text-lg flex-shrink-0">
+                      🚖
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-ink truncate">
+                        {trip.pickup_location} → {trip.destination}
+                      </div>
+                      <div className="text-xs text-ink-muted mt-0.5">
+                        {trip.passenger_name} · {trip.distance_km} km
+                      </div>
+                    </div>
+                    <div className="text-sm font-bold text-success flex-shrink-0">+₹{trip.fare}</div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

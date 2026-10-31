@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { useTripStore } from '../../store/tripStore';
 import LeafletMap from '../../components/map/LeafletMap';
+import AppShell from '../../components/ui/AppShell';
+import { EmptyState, StatusBadge, Spinner } from '../../components/ui/UIKit';
 import {
-  ArrowLeft, MapPin, Navigation, Car, Loader2, AlertCircle, Eye, XCircle, CheckCircle, Sparkles
+  MapPin, Navigation, Car, Loader2, AlertCircle, XCircle, CheckCircle, Sparkles
 } from 'lucide-react';
+import clsx from 'clsx';
 
 const VEHICLE_TYPES = [
-  { id: 'sedan', label: 'Sedan', icon: '🚗' },
-  { id: 'suv', label: 'SUV', icon: '🚙' },
-  { id: 'hatchback', label: 'Hatchback', icon: '🚘' },
-  { id: 'auto', label: 'Auto', icon: '🛺' },
+  { id: 'sedan',    label: 'Sedan',    icon: '🚗', desc: 'Comfortable 4-seater' },
+  { id: 'suv',      label: 'SUV',      icon: '🚙', desc: 'Spacious 6-seater' },
+  { id: 'hatchback',label: 'Hatchback',icon: '🚘', desc: 'Budget compact' },
+  { id: 'auto',     label: 'Auto',     icon: '🛺', desc: 'Quick & nimble' },
 ];
 
 const POPULAR_LOCATIONS = [
@@ -29,23 +32,17 @@ export default function BookRide() {
   const queryClient = useQueryClient();
   const setActiveTrip = useTripStore((s) => s.setActiveTrip);
 
-  const [form, setForm] = useState({
-    pickup_location: '',
-    destination: '',
-    vehicle_type: 'sedan',
-  });
+  const [form, setForm] = useState({ pickup_location: '', destination: '', vehicle_type: 'sedan' });
   const [fareEstimate, setFareEstimate] = useState(null);
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // 1. Check if passenger already has an active ride in progress
   const { data: dashboardData } = useQuery({
     queryKey: ['passengerDashboard'],
     queryFn: () => api.get('/passenger/dashboard').then((r) => r.data),
     refetchInterval: 5000,
   });
-
   const activeRide = dashboardData?.activeRide;
 
   const handleChange = (e) => {
@@ -54,7 +51,6 @@ export default function BookRide() {
     setError('');
   };
 
-  // 2. Estimate fare
   const estimateFare = async () => {
     if (!form.pickup_location.trim() || !form.destination.trim()) {
       setError('Please enter both pickup and destination locations.');
@@ -83,7 +79,6 @@ export default function BookRide() {
     }
   };
 
-  // 3. Book ride mutation
   const bookMutation = useMutation({
     mutationFn: () =>
       api.post('/rides/book', {
@@ -105,7 +100,6 @@ export default function BookRide() {
     },
   });
 
-  // 4. Cancel active ride mutation
   const cancelMutation = useMutation({
     mutationFn: (requestId) => api.post(`/rides/cancel/${requestId}`),
     onSuccess: () => {
@@ -115,237 +109,186 @@ export default function BookRide() {
       queryClient.invalidateQueries({ queryKey: ['passengerTrips'] });
       setTimeout(() => setSuccessMsg(''), 4000);
     },
-    onError: (err) => {
-      setError(err.response?.data?.message || 'Failed to cancel active ride.');
-    },
+    onError: (err) => setError(err.response?.data?.message || 'Failed to cancel active ride.'),
   });
 
+  const showMapPreview = form.pickup_location.trim() && form.destination.trim();
+
   return (
-    <div className="min-h-screen bg-[hsl(220,15%,10%)] pb-12">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[hsl(220,15%,24%)] bg-[hsl(220,15%,10%)]/95 backdrop-blur">
-        <Link
-          to="/passenger/dashboard"
-          className="flex items-center gap-2 text-[hsl(220,10%,60%)] hover:text-white transition font-medium"
-        >
-          <ArrowLeft size={18} />
-          <span>Back to Dashboard</span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🚖</span>
-          <span className="text-white font-bold font-['Outfit']">Book a Ride</span>
-        </div>
-      </nav>
+    <AppShell title="Book a Ride" subtitle="Enter your route and request a driver">
+      <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        {/* ACTIVE RIDE WARNING BANNER */}
+        {/* Active Ride Warning */}
         {activeRide && (
-          <div className="p-5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 shadow-xl space-y-3">
-            <div className="flex items-start gap-3">
-              <AlertCircle size={22} className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-amber-300 font-bold text-base">
-                  You already have an active ride request in progress!
-                </div>
-                <p className="text-gray-300 text-sm mt-0.5">
-                  Request #{activeRide.request_id}: <strong className="text-white">{activeRide.pickup_location}</strong> → <strong className="text-white">{activeRide.destination}</strong>
-                </p>
-                <div className="text-xs text-amber-400 mt-1 uppercase font-semibold">
-                  Status: {activeRide.status.replace('_', ' ')}
-                </div>
+          <div className="card-sm p-4 bg-warning-bg border-warning/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={18} className="text-warning flex-shrink-0" />
+              <div>
+                <div className="text-sm font-semibold text-ink">You already have an active ride</div>
+                <div className="text-xs text-ink-muted">Cancel it first to book a new one.</div>
               </div>
             </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <Link
-                to="/passenger/active-trip"
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition cursor-pointer shadow"
-              >
-                <Eye size={16} />
-                Track Live Ride
-              </Link>
-              <button
-                type="button"
-                onClick={() => cancelMutation.mutate(activeRide.request_id)}
-                disabled={cancelMutation.isPending}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-950/30 font-semibold text-sm transition cursor-pointer disabled:opacity-50"
-              >
-                {cancelMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
-                Cancel This Ride
-              </button>
-            </div>
+            <button
+              onClick={() => cancelMutation.mutate(activeRide.request_id)}
+              disabled={cancelMutation.isPending}
+              className="btn-danger text-xs px-3 py-2"
+            >
+              {cancelMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
+              Cancel Ride
+            </button>
           </div>
         )}
 
-        {/* Feedback Alerts */}
+        {/* Success Message */}
         {successMsg && (
-          <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-sm flex items-center gap-2">
-            <CheckCircle size={18} />
-            <span>{successMsg}</span>
+          <div className="card-sm p-4 bg-success-bg border-success/20 flex items-center gap-2 text-success text-sm font-medium">
+            <CheckCircle size={16} /> {successMsg}
           </div>
         )}
 
-        {error && (
-          <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-sm flex items-center gap-2">
-            <AlertCircle size={18} />
-            <span>{error}</span>
+        {/* Booking Form */}
+        <div className="card p-6 space-y-5">
+          <h2 className="text-base font-semibold text-ink">Route Details</h2>
+
+          {/* Error */}
+          {error && (
+            <div className="px-4 py-3 rounded-xl bg-error-bg border border-error/20 text-error text-sm flex items-center gap-2">
+              <AlertCircle size={15} /> {error}
+            </div>
+          )}
+
+          {/* Pickup */}
+          <div>
+            <label className="block text-xs font-semibold text-ink-muted mb-2 flex items-center gap-1.5">
+              <MapPin size={13} className="text-success" /> Pickup Location
+            </label>
+            <input
+              type="text"
+              name="pickup_location"
+              value={form.pickup_location}
+              onChange={handleChange}
+              placeholder="Enter pickup address or landmark"
+              className="input-field"
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {POPULAR_LOCATIONS.slice(0, 3).map((loc) => (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => { setForm({ ...form, pickup_location: loc }); setFareEstimate(null); }}
+                  className="text-[11px] px-2.5 py-1 rounded-lg bg-canvas border border-line text-ink-muted hover:text-ink hover:border-line-2 transition"
+                >
+                  {loc.split(',')[0]}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Booking Card */}
-        <div
-          className="rounded-2xl p-6 sm:p-8"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid hsl(220,15%,24%)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          }}
-        >
-          <div className="space-y-5">
-            {/* Pickup */}
+          {/* Destination */}
+          <div>
+            <label className="block text-xs font-semibold text-ink-muted mb-2 flex items-center gap-1.5">
+              <Navigation size={13} className="text-error" /> Destination
+            </label>
+            <input
+              type="text"
+              name="destination"
+              value={form.destination}
+              onChange={handleChange}
+              placeholder="Enter drop-off address or landmark"
+              className="input-field"
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {POPULAR_LOCATIONS.slice(3, 6).map((loc) => (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => { setForm({ ...form, destination: loc }); setFareEstimate(null); }}
+                  className="text-[11px] px-2.5 py-1 rounded-lg bg-canvas border border-line text-ink-muted hover:text-ink hover:border-line-2 transition"
+                >
+                  {loc.split(',')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Vehicle Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-ink-muted mb-3 flex items-center gap-1.5">
+              <Car size={13} className="text-info" /> Vehicle Type
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {VEHICLE_TYPES.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => { setForm({ ...form, vehicle_type: v.id }); setFareEstimate(null); }}
+                  className={clsx(
+                    'py-3.5 px-3 rounded-xl text-sm font-medium transition flex flex-col items-center gap-1.5 border cursor-pointer',
+                    form.vehicle_type === v.id
+                      ? 'bg-brand-light border-brand/30 text-brand shadow-sm'
+                      : 'bg-white border-line text-ink-muted hover:border-line-2 hover:text-ink'
+                  )}
+                >
+                  <span className="text-xl">{v.icon}</span>
+                  <span className="font-semibold text-xs">{v.label}</span>
+                  <span className="text-[10px] text-center leading-tight opacity-70">{v.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fare Estimate */}
+          {fareEstimate && (
+            <div className="p-4 rounded-xl bg-brand-50 border border-brand/20 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs text-ink-muted font-medium mb-1">Estimated Fare</div>
+                <div className="text-2xl font-bold text-ink">₹{fareEstimate.fare}</div>
+                <div className="text-xs text-ink-muted mt-1">~{fareEstimate.distance_km} km · {fareEstimate.availableDrivers} driver(s) nearby</div>
+              </div>
+              <span className="badge bg-success-bg text-success text-xs">Instant Dispatch</span>
+            </div>
+          )}
+
+          {/* Map Preview */}
+          {showMapPreview && (
             <div>
-              <label className="block text-sm text-[hsl(220,10%,70%)] mb-1.5 flex items-center gap-2 font-medium">
-                <MapPin size={16} className="text-emerald-400" />
-                Pickup Location
-              </label>
-              <input
-                type="text"
-                name="pickup_location"
-                value={form.pickup_location}
-                onChange={handleChange}
-                placeholder="e.g. Anna Nagar Roundtana"
-                className="w-full px-4 py-3 rounded-xl bg-[hsl(220,15%,12%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-amber-400 transition"
-              />
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <span className="text-[11px] text-[hsl(220,10%,50%)] mr-1 self-center">Suggestions:</span>
-                {POPULAR_LOCATIONS.slice(0, 3).map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => { setForm({ ...form, pickup_location: loc }); setFareEstimate(null); }}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-[hsl(220,15%,18%)] hover:bg-[hsl(220,15%,24%)] text-gray-300 transition"
-                  >
-                    {loc.split(',')[0]}
-                  </button>
-                ))}
+              <div className="text-xs font-semibold text-ink-muted mb-2 flex items-center justify-between">
+                <span>Route Preview</span>
+                <span className="text-[11px] text-brand font-medium">Interactive Map</span>
+              </div>
+              <div className="rounded-2xl overflow-hidden border border-line h-56">
+                <LeafletMap
+                  pickupCoords={form.pickup_location}
+                  dropCoords={form.destination}
+                  theme="voyager"
+                />
               </div>
             </div>
+          )}
 
-            {/* Destination */}
-            <div>
-              <label className="block text-sm text-[hsl(220,10%,70%)] mb-1.5 flex items-center gap-2 font-medium">
-                <Navigation size={16} className="text-red-400" />
-                Destination Location
-              </label>
-              <input
-                type="text"
-                name="destination"
-                value={form.destination}
-                onChange={handleChange}
-                placeholder="e.g. Chennai Airport"
-                className="w-full px-4 py-3 rounded-xl bg-[hsl(220,15%,12%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-amber-400 transition"
-              />
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <span className="text-[11px] text-[hsl(220,10%,50%)] mr-1 self-center">Suggestions:</span>
-                {POPULAR_LOCATIONS.slice(3).map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => { setForm({ ...form, destination: loc }); setFareEstimate(null); }}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-[hsl(220,15%,18%)] hover:bg-[hsl(220,15%,24%)] text-gray-300 transition"
-                  >
-                    {loc.split(',')[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Vehicle Type Selection */}
-            <div>
-              <label className="block text-sm text-[hsl(220,10%,70%)] mb-2 flex items-center gap-2 font-medium">
-                <Car size={16} className="text-amber-400" />
-                Select Vehicle Tier
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {VEHICLE_TYPES.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => { setForm({ ...form, vehicle_type: v.id }); setFareEstimate(null); }}
-                    className={`py-3 px-3 rounded-xl text-sm font-semibold transition flex flex-col items-center gap-1 cursor-pointer border ${
-                      form.vehicle_type === v.id
-                        ? 'bg-amber-500 text-black border-amber-400 shadow-md'
-                        : 'bg-[hsl(220,15%,14%)] text-gray-300 border-[hsl(220,15%,22%)] hover:bg-[hsl(220,15%,18%)]'
-                    }`}
-                  >
-                    <span className="text-xl">{v.icon}</span>
-                    <span>{v.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Fare Estimate Display */}
-            {fareEstimate && (
-              <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-[hsl(220,10%,60%)] block font-medium">Estimated Road Fare</span>
-                  <div className="text-3xl font-extrabold text-amber-400">
-                    ₹{fareEstimate.fare}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-0.5">
-                    ~{fareEstimate.distance_km} km • {fareEstimate.availableDrivers} driver(s) nearby
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 font-medium">
-                    Instant Dispatch
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Route Map Preview */}
-            {form.pickup_location.trim() && form.destination.trim() && (
-              <div className="space-y-2">
-                <div className="text-xs text-[hsl(220,10%,60%)] font-semibold uppercase tracking-wider flex items-center justify-between">
-                  <span>🗺️ Route Overview</span>
-                  <span className="text-[11px] text-emerald-400">Interactive GIS Preview</span>
-                </div>
-                <div className="rounded-2xl overflow-hidden border border-[hsl(220,15%,24%)] h-64 bg-[hsl(220,15%,12%)]">
-                  <LeafletMap
-                    pickupCoords={form.pickup_location}
-                    dropCoords={form.destination}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-3">
-              <button
-                type="button"
-                onClick={estimateFare}
-                disabled={estimating || !form.pickup_location.trim() || !form.destination.trim()}
-                className="flex-1 py-3 rounded-xl border border-amber-500/50 text-amber-400 font-bold hover:bg-amber-500/10 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {estimating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                Get Fare Quote
-              </button>
-              <button
-                type="button"
-                onClick={() => bookMutation.mutate()}
-                disabled={bookMutation.isPending || !form.pickup_location.trim() || !form.destination.trim()}
-                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold transition cursor-pointer disabled:opacity-50 shadow-lg flex items-center justify-center gap-2"
-              >
-                {bookMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <Car size={18} />}
-                Request Ride Now
-              </button>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={estimateFare}
+              disabled={estimating || !form.pickup_location.trim() || !form.destination.trim()}
+              className="btn-secondary flex-1 disabled:opacity-50"
+            >
+              {estimating ? <Spinner size={15} className="text-ink-muted" /> : <Sparkles size={15} />}
+              Get Fare Quote
+            </button>
+            <button
+              type="button"
+              onClick={() => bookMutation.mutate()}
+              disabled={bookMutation.isPending || !!activeRide || !form.pickup_location.trim() || !form.destination.trim()}
+              className="btn-primary flex-1 disabled:opacity-50"
+            >
+              {bookMutation.isPending ? <Spinner size={15} className="text-white" /> : <Car size={15} />}
+              Request Ride
+            </button>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

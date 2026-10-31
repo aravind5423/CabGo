@@ -1,23 +1,11 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
-import {
-  MapPin, Clock, LogOut, ArrowLeft, DollarSign, Car, Calendar, CheckCircle, XCircle
-} from 'lucide-react';
-
-const STATUS_COLORS = {
-  completed:   'bg-emerald-900/40 text-emerald-400 border border-emerald-500/30',
-  cancelled:   'bg-red-900/40 text-red-400 border border-red-500/30',
-  pending:     'bg-amber-900/40 text-amber-400 border border-amber-500/30',
-  accepted:    'bg-blue-900/40 text-blue-400 border border-blue-500/30',
-  in_progress: 'bg-purple-900/40 text-purple-400 border border-purple-500/30',
-};
+import { Car, Clock, DollarSign, CheckCircle } from 'lucide-react';
+import AppShell from '../../components/ui/AppShell';
+import { KPICard, StatusBadge, EmptyState, Skeleton } from '../../components/ui/UIKit';
 
 export default function PassengerHistory() {
-  const { user, logout } = useAuthStore();
-  const navigate = useNavigate();
-
   const { data, isLoading } = useQuery({
     queryKey: ['passengerTrips'],
     queryFn: () => api.get('/passenger/trips').then((r) => r.data),
@@ -25,152 +13,167 @@ export default function PassengerHistory() {
 
   const trips = data?.trips || data?.data || [];
 
-  const handleLogout = async () => {
-    try { await api.post('/auth/logout'); } catch (_) {}
-    logout();
-    navigate('/login');
-  };
-
   const totalSpent = trips.reduce(
-    (acc, t) => acc + (t.status === 'completed' || t.trip_status === 'completed' ? Number(t.fare || t.estimated_fare || 0) : 0),
+    (acc, t) =>
+      acc + (t.status === 'completed' || t.trip_status === 'completed'
+        ? Number(t.fare || t.estimated_fare || 0)
+        : 0),
     0
   );
 
+  const completedCount = trips.filter((t) => (t.status || t.trip_status) === 'completed').length;
+  const cancelledCount = trips.filter((t) => (t.status || t.trip_status) === 'cancelled').length;
+
   return (
-    <div className="min-h-screen bg-[hsl(220,15%,10%)] pb-12">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[hsl(220,15%,24%)] bg-[hsl(220,15%,10%)]/95 backdrop-blur">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/passenger/dashboard"
-            className="flex items-center gap-2 text-[hsl(220,10%,60%)] hover:text-white transition"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-sm font-semibold">Dashboard</span>
-          </Link>
-          <span className="text-gray-600">|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🚖</span>
-            <span className="font-bold text-white text-xl font-['Outfit']">CabGo</span>
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-900/40 text-cyan-400 border border-cyan-500/30">
-              Trip History
-            </span>
-          </div>
+    <AppShell
+      title="Ride History"
+      subtitle="Review all your past journeys"
+      action={
+        <Link to="/passenger/book-ride" className="btn-primary text-sm">
+          + Book Ride
+        </Link>
+      }
+    >
+      <div className="space-y-5 animate-fade-in">
+
+        {/* Summary KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="card-sm p-5 space-y-3">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-7 w-16" />
+              </div>
+            ))
+          ) : (
+            <>
+              <KPICard label="Total Trips"  value={trips.length}           icon={Car}          iconClass="text-info" />
+              <KPICard label="Completed"    value={completedCount}          icon={CheckCircle}  iconClass="text-success" />
+              <KPICard label="Cancelled"    value={cancelledCount}          icon={Car}          iconClass="text-error" />
+              <KPICard label="Total Spent"  value={`₹${totalSpent.toFixed(0)}`} icon={DollarSign} iconClass="text-brand" accentBg />
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-4">
-          <Link
-            to="/passenger/book-ride"
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500 text-black hover:bg-amber-400 transition"
-          >
-            + Book Ride
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm text-[hsl(220,10%,60%)] hover:text-white hover:bg-[hsl(220,15%,16%)] transition cursor-pointer"
-          >
-            <LogOut size={16} />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
-        </div>
-      </nav>
-
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* Header & KPI Summary */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-white font-['Outfit']">My Ride History</h1>
-            <p className="text-sm text-[hsl(220,10%,60%)] mt-1">Review all your completed, active, and cancelled journeys</p>
+        {/* Trip List */}
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-line">
+            <h2 className="text-sm font-semibold text-ink">All Trips</h2>
+            <p className="text-xs text-ink-muted mt-0.5">{trips.length} total records</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-xl bg-[hsl(220,15%,16%)] border border-[hsl(220,15%,24%)] text-right">
-              <span className="text-[11px] text-[hsl(220,10%,50%)] block">Total Trips</span>
-              <span className="text-base font-bold text-white">{trips.length}</span>
-            </div>
-            <div className="px-4 py-2 rounded-xl bg-[hsl(220,15%,16%)] border border-[hsl(220,15%,24%)] text-right">
-              <span className="text-[11px] text-[hsl(220,10%,50%)] block">Total Spent</span>
-              <span className="text-base font-bold text-amber-400">₹{totalSpent.toFixed(0)}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Trips List */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 rounded-2xl bg-[hsl(220,15%,16%)] animate-pulse" />
-            ))}
-          </div>
-        ) : trips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-[hsl(220,15%,24%)] rounded-2xl bg-[hsl(220,15%,12%)]">
-            <Car size={40} className="text-[hsl(220,10%,40%)] mb-3" />
-            <h3 className="text-base font-bold text-white">No Trips Recorded</h3>
-            <p className="text-xs text-[hsl(220,10%,50%)] mt-1 max-w-sm">
-              You haven't taken any trips yet. Book your first ride across Chennai!
-            </p>
-            <Link
-              to="/passenger/book-ride"
-              className="mt-4 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition"
-            >
-              Book a Ride Now
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {trips.map((trip) => {
-              const status = trip.trip_status || trip.status || 'completed';
-              return (
-                <div
-                  key={trip.trip_id || trip.request_id}
-                  className="p-5 rounded-2xl border border-[hsl(220,15%,22%)] bg-[hsl(220,15%,14%)] hover:border-[hsl(220,15%,30%)] transition shadow-md"
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-white font-medium">
-                        <MapPin size={15} className="text-emerald-400 flex-shrink-0" />
-                        <span className="truncate">From: {trip.pickup_location}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-[hsl(220,10%,70%)] font-medium">
-                        <MapPin size={15} className="text-red-400 flex-shrink-0" />
-                        <span className="truncate">To: {trip.destination}</span>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs text-[hsl(220,10%,50%)] pt-1">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={13} />
-                          {trip.start_time
-                            ? new Date(trip.start_time).toLocaleDateString()
-                            : new Date(trip.requested_at).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={13} />
-                          {trip.start_time
-                            ? new Date(trip.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : new Date(trip.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {trip.driver_name && (
-                          <span className="text-gray-400">
-                            Driver: <strong className="text-white">{trip.driver_name}</strong>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-[hsl(220,15%,20%)]">
-                      <div className="text-xl font-extrabold text-amber-400">
-                        ₹{trip.fare || trip.estimated_fare || '—'}
-                      </div>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider mt-1 ${STATUS_COLORS[status] || STATUS_COLORS.completed}`}>
-                        {status.replace('_', ' ')}
-                      </span>
-                    </div>
+          {isLoading ? (
+            <div className="p-5 space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-56" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
+                  <Skeleton className="h-6 w-20 rounded-full" />
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
-    </div>
+              ))}
+            </div>
+          ) : trips.length === 0 ? (
+            <EmptyState
+              icon={Car}
+              title="No trips found"
+              description="Your completed, cancelled, and active trips will appear here."
+              action={
+                <Link to="/passenger/book-ride" className="btn-primary">
+                  Book your first ride
+                </Link>
+              }
+            />
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Ride</th>
+                      <th>Route</th>
+                      <th>Date</th>
+                      <th>Vehicle</th>
+                      <th>Fare</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trips.map((ride) => {
+                      const rid = ride.request_id || ride.trip_id;
+                      const status = ride.status || ride.trip_status;
+                      return (
+                        <tr key={rid}>
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-canvas flex items-center justify-center text-sm flex-shrink-0">
+                                🚖
+                              </div>
+                              <span className="font-mono text-xs text-ink-muted">#{rid}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="text-sm font-medium text-ink max-w-[220px] truncate">
+                              {ride.pickup_location} → {ride.destination}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-1.5 text-xs text-ink-muted">
+                              <Clock size={12} />
+                              {ride.requested_at || ride.start_time || '—'}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge bg-canvas text-ink-muted capitalize">
+                              {ride.vehicle_type || 'Sedan'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="text-sm font-semibold text-ink">
+                              ₹{ride.fare || ride.estimated_fare || '—'}
+                            </span>
+                          </td>
+                          <td><StatusBadge status={status} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="sm:hidden divide-y divide-[#F3F4F6]">
+                {trips.map((ride) => {
+                  const rid = ride.request_id || ride.trip_id;
+                  const status = ride.status || ride.trip_status;
+                  return (
+                    <div key={rid} className="px-4 py-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-canvas flex items-center justify-center text-lg flex-shrink-0">
+                        🚖
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-ink truncate">
+                          {ride.pickup_location} → {ride.destination}
+                        </div>
+                        <div className="text-xs text-ink-muted mt-0.5 capitalize">
+                          {ride.vehicle_type || 'Sedan'} · {ride.requested_at || ride.start_time || 'Recent'}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-semibold text-ink mb-1">₹{ride.fare || ride.estimated_fare || '—'}</div>
+                        <StatusBadge status={status} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </AppShell>
   );
 }
