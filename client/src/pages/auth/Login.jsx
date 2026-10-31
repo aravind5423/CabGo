@@ -18,14 +18,17 @@ export default function Login() {
     setError('');
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (e, customCreds = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
     setError('');
+    const targetEmail = customCreds ? customCreds.email : form.email;
+    const targetPassword = customCreds ? customCreds.password : form.password;
+
     try {
       const { data } = await api.post('/auth/login', {
-        email: form.email,
-        password: form.password,
+        email: targetEmail,
+        password: targetPassword,
       });
       login(data.token, data.user);
       const paths = {
@@ -36,10 +39,16 @@ export default function Login() {
       };
       navigate(paths[data.user.role] || '/login');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillAndLogin = (email, password) => {
+    setForm((prev) => ({ ...prev, email, password }));
+    setError('');
+    handleLogin(null, { email, password });
   };
 
   const handleRegister = async (e) => {
@@ -106,14 +115,14 @@ export default function Login() {
           {tab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Email</label>
+                <label className="block text-sm text-[hsl(220,10%,60%)] mb-1">Email or Username</label>
                 <input
-                  type="email"
+                  type="text"
                   name="email"
                   value={form.email}
                   onChange={handleChange}
                   required
-                  placeholder="passenger1@cab.com"
+                  placeholder="e.g. superadmin, driver1, or user@cab.com"
                   className="w-full px-4 py-2.5 rounded-xl bg-[hsl(220,15%,10%)] border border-[hsl(220,15%,24%)] text-white placeholder-[hsl(220,10%,40%)] focus:outline-none focus:border-[hsl(38,95%,55%)] transition-colors"
                 />
               </div>
@@ -136,6 +145,43 @@ export default function Login() {
               >
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
+
+              {/* Quick Demo Logins */}
+              <div className="mt-6 pt-5 border-t border-[hsl(220,15%,20%)]">
+                <p className="text-xs text-[hsl(220,10%,50%)] text-center mb-3 font-semibold uppercase tracking-wider">
+                  Quick Demo Login (1-Click Fill &amp; Sign In)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fillAndLogin('superadmin', 'password123')}
+                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-amber-400 font-medium border border-amber-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>👑</span> Super Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillAndLogin('admin', 'password123')}
+                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-blue-400 font-medium border border-blue-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🛡️</span> Ops Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillAndLogin('driver1', 'password123')}
+                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-emerald-400 font-medium border border-emerald-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🚗</span> Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillAndLogin('passenger1', 'password123')}
+                    className="text-xs py-2 px-2.5 rounded-lg bg-[hsl(220,15%,16%)] hover:bg-[hsl(220,15%,22%)] text-cyan-400 font-medium border border-cyan-500/20 transition text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🎒</span> Passenger
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 
