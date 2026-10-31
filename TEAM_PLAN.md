@@ -7,6 +7,104 @@
 
 ---
 
+## 🚀 PRODUCTION UPGRADE: Next-Gen Architecture & Modernization Plan
+
+> 🚀 **PRODUCTION MIGRATION IN PROGRESS**: The team is transitioning CabGo from the original raw HTML/Node.js academic proof-of-concept into an enterprise-grade production platform.  
+> 📖 **Comprehensive Implementation Specification**: See [PRODUCTION_MIGRATION_PLAN.md](PRODUCTION_MIGRATION_PLAN.md) for full architecture diagrams, Socket.IO event contracts, concurrency safeguards, and Docker configuration.  
+> 🏁 **Parallel Kickoff Guide**: See [TEAMMATE_KICKOFF.md](TEAMMATE_KICKOFF.md) for copy-pasteable Day 1 commands and file setups for Teammates A & B.
+
+### 👥 Workstream Assignments
+| Stream | Focus Area | Technologies | Owner / Lead |
+| :--- | :--- | :--- | :--- |
+| **Stream 1: Backend Core** | Express API, TypeScript, Zod validation, ACID MySQL pool | Express, TypeScript, Zod, `mysql2/promise` | Backend Lead |
+| **Stream 2: Real-Time & Infra** | Socket.IO server, Redis Pub/Sub adapter, Redis GEO proximity dispatch | Socket.IO, Redis 7.x, Docker Compose | Real-Time / DevOps Lead |
+| **Stream 3: Modern SPA Frontend** | React 19, Vite, Tailwind CSS, Zustand, Leaflet GIS maps | React, Vite, TypeScript, Tailwind, Leaflet | Frontend Lead |
+| **Stream 4: Testing & Concurrency** | Vitest unit tests, Supertest API suite, k6 double-booking stress test | Vitest, Supertest, Playwright, k6 | QA / Test Lead |
+
+---
+
+### 🔀 Parallel Team Work Allocation (2-Teammate vs 3-Person Breakdown)
+
+#### Scenario A: 2 Teammates (Frontend vs Backend/Real-Time Split)
+```mermaid
+flowchart TD
+    subgraph TeammateA ["Teammate A: Backend, Real-Time & Infra Lead"]
+        direction TB
+        A1["Phase 1: Express + TypeScript + Zod + ACID DB Pool"]
+        A2["Phase 2: Socket.IO Engine + Redis GEO Proximity Dispatch"]
+        A3["Phase 5: Docker Compose + Redis Cluster + Supertest Suite"]
+        A1 --> A2 --> A3
+    end
+
+    subgraph TeammateB ["Teammate B: Frontend & GIS UI Lead"]
+        direction TB
+        B1["Phase 3: React 19 + Vite + Tailwind + Zustand SPA"]
+        B2["Phase 4: Leaflet GIS Maps + Animated Car HUD + Portals"]
+        B3["Phase 6: UI Polish & Playwright Browser E2E Tests"]
+        B1 --> B2 --> B3
+    end
+
+    TeammateA <-->|"Decoupled Contract (PRODUCTION_MIGRATION_PLAN.md)"| TeammateB
+```
+
+- **Teammate A (Backend & Real-Time)**:
+  - **Phases Owned**: Phase 1, Phase 2, Phase 5.
+  - **Directory Scope**: `server/`, `database/`, `docker-compose.yml`, `Dockerfile`.
+  - **Git Branch**: `feat/backend-realtime`.
+  - **Deliverables**: Express REST endpoints, atomic compare-and-swap SQL queries, Socket.IO rooms and Redis proximity matching.
+- **Teammate B (Frontend & GIS)**:
+  - **Phases Owned**: Phase 3, Phase 4, Phase 6.
+  - **Directory Scope**: `client/` (new Vite SPA directory).
+  - **Git Branch**: `feat/frontend-spa`.
+  - **Deliverables**: Modern single-page application with 4 role-based portals (Passenger, Driver, Admin, SuperAdmin), Leaflet maps, live telemetry HUD.
+- **Why they never block each other**:
+  - **Zero Git Merge Conflicts**: Teammate A only touches `server/`; Teammate B only touches `client/`.
+  - **Pre-agreed Contract**: Teammate B codes against the event specifications in `PRODUCTION_MIGRATION_PLAN.md` without waiting for backend completion.
+
+---
+
+#### Scenario B: 3-Person Split (You + 2 Teammates)
+| Role / Person | Focus Area | Phases Owned | File Boundary |
+| :--- | :--- | :--- | :--- |
+| **Teammate 1 (Backend Core & DB)** | Express REST API, TypeScript, Zod schemas, MySQL connection pool, atomic updates, JWT auth cookies, Docker. | **Phase 1 & Phase 5** | `server/src/routes/`, `server/src/controllers/`, `docker-compose.yml` |
+| **Teammate 2 (Real-Time & GIS)** | Socket.IO server gateway, Redis GEO driver proximity index, Leaflet map polyline integration, live car animation. | **Phase 2 & Phase 4** | `server/src/sockets/`, `client/src/components/map/` |
+| **Teammate 3 / You (Frontend SPA & QA Lead)** | Vite React scaffold, Tailwind design system, Zustand stores, 4 portals (Passenger, Driver, Admin, SuperAdmin), E2E test verification. | **Phase 3 & Phase 6** | `client/src/pages/`, `client/src/store/`, `e2e_test.js` |
+
+
+### 🗓️ 5-Sprint Implementation Schedule
+```mermaid
+gantt
+    title Modernization Sprints (15 Days)
+    dateFormat  YYYY-MM-DD
+    section Backend
+    Express + TypeScript + Zod       :done,    des1, 2026-11-01, 3d
+    Atomic ACID Concurrency Updates  :active,  des2, 2026-11-02, 2d
+    section Real-Time
+    Socket.IO Engine + Rooms         :active,  des3, 2026-11-04, 3d
+    Redis GEO Proximity Dispatch     :         des4, 2026-11-06, 2d
+    section Frontend
+    React + Vite + Tailwind Setup    :         des5, 2026-11-07, 3d
+    Leaflet Maps & Telemetry HUD     :         des6, 2026-11-10, 3d
+    section Hardening
+    Dockerization & Concurrency Tests:         des7, 2026-11-13, 3d
+```
+
+### 📋 Team Implementation Checklist (Next Actions)
+- [ ] **Backend**: Initialize `server/` with `tsconfig.json`, `express`, `cors`, `helmet`, and `zod`.
+- [ ] **Backend**: Implement atomic SQL update for ride acceptance (`UPDATE ride_requests SET status = 'accepted' WHERE request_id = ? AND status = 'pending'`).
+- [ ] **Real-Time**: Attach `Socket.io` to Express server and configure Redis Pub/Sub adapter.
+- [ ] **Real-Time**: Implement `driver:ping_location` with Redis `GEOADD` and `GEOSEARCH` within 5km.
+- [ ] **Frontend**: Scaffold Vite React app in `client/` with Tailwind CSS and Zustand stores (`useAuthStore`, `useTripStore`).
+- [ ] **Frontend**: Replace SVG path `roadBed` with Leaflet OpenStreetMap tiles and animated car marker.
+- [ ] **QA**: Port `e2e_test.js` to `supertest` + `vitest` and write race condition test script.
+
+---
+
+## 🏛️ Historical Context (Original CIA Academic Plan)
+*(The section below documents the original raw vanilla JS/Node.js implementation developed under strict zero-framework constraints).*
+
+---
+
 ## 👥 Team Workflow Rules
 
 1. **Commit naming convention**: `feat(scope): description` | `fix(scope): description` | `chore: description`

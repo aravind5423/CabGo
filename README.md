@@ -4,6 +4,8 @@
 > **Tech Stack**: HTML5 · CSS3 (Vanilla) · Vanilla JavaScript · DOM Manipulation · Fetch API · Node.js (Built-in HTTP & Crypto Modules Only) · MySQL  
 > **Strict Constraint**: ❌ No React, Angular, Vue, Express.js, or any web framework used.
 
+> 🚀 **Production Modernization In Progress**: See [PRODUCTION_MIGRATION_PLAN.md](PRODUCTION_MIGRATION_PLAN.md) for the master blueprint, [TEAM_PLAN.md](TEAM_PLAN.md) for sprint milestones, and [TEAMMATE_KICKOFF.md](TEAMMATE_KICKOFF.md) for Teammate A & B Day-1 setup instructions.
+
 ---
 
 ## 🌟 Overview
