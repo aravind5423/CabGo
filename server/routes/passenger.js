@@ -117,6 +117,7 @@ module.exports = function passengerRoute(router) {
               pickup: pickup.trim(),
               destination: destination.trim(),
               estimated_km: estimatedKm,
+              estimated_fare: fareOptions[0]?.estimated_fare || null,
               availableDrivers: Number(driverCount[0].count),
               fareOptions
           });
@@ -303,18 +304,23 @@ module.exports = function passengerRoute(router) {
 
       const trip = trips.length > 0 ? trips[0] : null;
 
+      const rideDetails = {
+        request_id:      ride.request_id,
+        pickup_location: ride.pickup_location,
+        destination:     ride.destination,
+        vehicle_type:    ride.vehicle_type,
+        estimated_fare:  ride.estimated_fare,
+        status:          ride.status,
+        requested_at:    ride.requested_at,
+        trip,
+      };
+
       req.sendJSON(200, {
         success: true,
-        ride: {
-          request_id:      ride.request_id,
-          pickup_location: ride.pickup_location,
-          destination:     ride.destination,
-          vehicle_type:    ride.vehicle_type,
-          estimated_fare:  ride.estimated_fare,
-          status:          ride.status,
-          requested_at:    ride.requested_at,
-          trip,
-        },
+        status:  ride.status,
+        ride:    rideDetails,
+        request: rideDetails,
+        trip,
       });
     } catch (err) {
       console.error('[rides/status]', err.message);
@@ -345,15 +351,19 @@ module.exports = function passengerRoute(router) {
         return req.sendJSON(404, { success: false, message: 'Ride request not found.' });
       }
 
-      if (requests[0].status !== 'pending') {
+      if (!['pending', 'accepted'].includes(requests[0].status)) {
         return req.sendJSON(400, {
           success: false,
-          message: `Cannot cancel ride with status '${requests[0].status}'. Only pending rides can be cancelled directly.`,
+          message: `Cannot cancel ride with status '${requests[0].status}'. Only pending or accepted rides can be cancelled.`,
         });
       }
 
       await pool.execute(
         `UPDATE ride_requests SET status = 'cancelled' WHERE request_id = ?`,
+        [requestId]
+      );
+      await pool.execute(
+        `UPDATE trips SET trip_status = 'cancelled' WHERE request_id = ?`,
         [requestId]
       );
 
@@ -576,6 +586,29 @@ module.exports = function passengerRoute(router) {
       req.sendJSON(500, { success: false, message: 'Failed to update profile.' });
     } finally {
       conn.release();
+    }
+  });
+
+
+  // ── GET /api/passenger/trips (Compatibility Alias) ────────────
+  router.get('/api/passenger/trips', async (req, res) => {
+    const guard = requireRole(['passenger'])(req);
+    if (!guard.ok) return req.sendJSON(guard.status, { success: false, message: guard.message });
+    try {
+      const passengerId = await getPassengerId(pool, guard.user.user_id);
+      const [trips] = await pool.execute(
+        `SELECT rr.request_id, rr.pickup_location, rr.destination, rr.vehicle_type,
+                rr.estimated_fare, rr.status, rr.requested_at,
+                t.trip_id, t.trip_status, t.fare
+         FROM ride_requests rr
+         LEFT JOIN trips t ON rr.request_id = t.request_id
+         WHERE rr.passenger_id = ?
+         ORDER BY rr.requested_at DESC LIMIT 50`,
+        [passengerId]
+      );
+      req.sendJSON(200, { success: true, count: trips.length, trips, data: trips });
+    } catch (err) {
+      req.sendJSON(500, { success: false, message: err.message });
     }
   });
 
