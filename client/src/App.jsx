@@ -5,6 +5,8 @@ import PassengerDashboard from './pages/passenger/Dashboard';
 import BookRide from './pages/passenger/BookRide';
 import ActiveTrip from './pages/passenger/ActiveTrip';
 import DriverDashboard from './pages/driver/Dashboard';
+import AdminDashboard from './pages/admin/Dashboard';
+import SuperadminDashboard from './pages/superadmin/Dashboard';
 import ProtectedRoute from './components/ui/ProtectedRoute';
 
 const queryClient = new QueryClient({
@@ -55,6 +57,26 @@ export default function App() {
             element={
               <ProtectedRoute role="driver">
                 <DriverDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin Routes */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Superadmin Routes */}
+          <Route
+            path="/superadmin/dashboard"
+            element={
+              <ProtectedRoute role="superadmin">
+                <SuperadminDashboard />
               </ProtectedRoute>
             }
           />

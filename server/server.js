@@ -170,7 +170,7 @@ app.use('/api', async (req, res, next) => {
 });
 
 // ── 404 for unmatched /api/* ──────────────────────────────────
-app.use('/api/*', (_req, res) => {
+app.use('/api', (_req, res) => {
   res.status(404).json({ success: false, message: 'API endpoint not found' });
 });
 

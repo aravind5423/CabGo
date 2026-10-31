@@ -33,7 +33,7 @@ class Router {
   match(req) {
     const parsed   = url.parse(req.url, true);
     const pathname = parsed.pathname;
-    req.query      = parsed.query;
+    try { req.query = parsed.query; } catch (_) { try { Object.assign(req.query, parsed.query); } catch (__) {} }
 
     for (const route of this._routes) {
       if (req.method !== route.method) continue;

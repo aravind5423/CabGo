@@ -5,7 +5,10 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "node server/server.js",
+    "dev": "concurrently --names \"SRV,CLIENT\" -c \"yellow,cyan\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node server/server.js",
+    "dev:client": "npm run dev --prefix client",
+    "build:client": "npm run build --prefix client",
     "test": "node e2e_test.js",
     "db:setup": "node scripts/setup-tidb.js"
   },
@@ -41,6 +44,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
     "@types/supertest": "^7.2.1",
+    "concurrently": "^10.0.6",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
