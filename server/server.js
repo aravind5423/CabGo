@@ -52,7 +52,7 @@ adminRoute(router);
 superRoute(router);
 streamRoute(router);
 
-const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const CLIENT_DIST = path.join(__dirname, '..', 'client', 'dist');
 const PORT       = parseInt(process.env.SERVER_PORT, 10) || 5000;
 
 // ── Security Helper: recursive input sanitization ─────────────
@@ -174,10 +174,16 @@ app.use('/api', (_req, res) => {
   res.status(404).json({ success: false, message: 'API endpoint not found' });
 });
 
-// ── Static files (/public) ────────────────────────────────────
-// Serve index.html for bare "/" and extension-less paths (SPA-friendly)
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
-app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+// ── Static SPA Serving (React 19 build from /client/dist) ─────
+if (fs.existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      return res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+    }
+    next();
+  });
+}
 
 // ── HTTP Server ──────────────────────────────────────────────
 const server = http.createServer(app);
