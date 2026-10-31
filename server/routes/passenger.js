@@ -106,7 +106,7 @@ module.exports = function passengerRoute(router) {
 
           // Count online, approved drivers.
           const [driverCount] = await pool.execute(`
-              SELECT COUNT(*) AS count
+              SELECT COUNT(*) AS [count]
               FROM driver_profiles
               WHERE availability = 'online'
                 AND verification_status = 'approved'

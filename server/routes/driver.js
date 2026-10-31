@@ -363,7 +363,7 @@ module.exports = function driverRoute(router) {
         });
       }
 
-      // Lock and fetch ride request
+      // Fetch ride request details
       const [requests] = await conn.execute(
         `SELECT * FROM ride_requests WHERE request_id = ?`,
         [requestId]
@@ -375,19 +375,23 @@ module.exports = function driverRoute(router) {
       }
 
       const ride = requests[0];
-      if (ride.status !== 'pending') {
+
+      // Execute atomic conditional compare-and-swap update (prevents double-booking race condition)
+      const [updateResult] = await conn.execute(
+        `UPDATE ride_requests 
+         SET status = 'accepted' 
+         WHERE request_id = ? AND status = 'pending'`,
+        [requestId]
+      );
+
+      // If affectedRows === 0, another driver already accepted this ride!
+      if (!updateResult || updateResult.affectedRows === 0) {
         await conn.rollback();
         return req.sendJSON(409, {
           success: false,
-          message: `Ride is no longer available (Status: ${ride.status}).`,
+          message: 'This ride has already been accepted by another driver.'
         });
       }
-
-      // Update ride_request to accepted
-      await conn.execute(
-        `UPDATE ride_requests SET status = 'accepted' WHERE request_id = ?`,
-        [requestId]
-      );
 
       // Create trip record
       const [tripResult] = await conn.execute(
